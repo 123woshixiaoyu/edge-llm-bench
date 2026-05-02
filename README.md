@@ -25,6 +25,7 @@ docs/                 project report and experiment notes
 prompts/              benchmark prompt set
 results/raw/*.csv     reproducible benchmark result tables
 scripts/              benchmark and summary scripts
+serving/              Edge LLM Task Router MVP
 ```
 
 `llama.cpp/`, model weights, and raw per-case logs are intentionally excluded from git.
@@ -150,3 +151,28 @@ Representative Jetson run:
 Gemma 4 E2B Q8_0 is feasible on Jetson, but Q4_K_M is the better Gemma-side deployment candidate: it is smaller, faster, and uses less peak memory while preserving full GPU offload.
 
 Cross-hardware comparison: [results/figures/jetson_vs_5090.md](results/figures/jetson_vs_5090.md).
+
+## Project 2: Edge LLM Task Router
+
+Project 2 turns the benchmark decisions into a Jetson-first routing service. The gateway analyzes each request and decides whether it should run locally on Jetson, go to a remote RTX backend, or be rejected/degraded. The MVP uses a mock backend by default and includes an optional `llama.cpp` backend adapter.
+
+Key docs:
+
+- [serving/docs/serving_design.md](serving/docs/serving_design.md)
+- [serving/docs/routing_policy.md](serving/docs/routing_policy.md)
+
+Run the mock gateway:
+
+```bash
+cd /mnt/d/AI/edge-llm-bench
+.venv/bin/python -m uvicorn serving.app.main:app --host 127.0.0.1 --port 8000
+```
+
+Run policy and chat-path load tests:
+
+```bash
+.venv/bin/python serving/scripts/load_test_router.py --url http://127.0.0.1:8000
+.venv/bin/python serving/scripts/load_test_router.py --url http://127.0.0.1:8000 --endpoint chat --out serving/results/raw/router_chat_eval.csv
+```
+
+Current MVP result: both route-only and mock chat-path load tests match the expected route for 30/30 requests.

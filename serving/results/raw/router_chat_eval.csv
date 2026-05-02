@@ -1,0 +1,31 @@
+request_id,task_type,quality,privacy,estimated_prompt_tokens,route,selected_model,expected_route,match_expected,reasons,total_latency_ms,http_status
+loadtest-000,qa,low,allow_remote,4,local,qwen35_08b_q4,local,true,task_type=qa fits local default policy; estimated_prompt_tokens=4 <= max_local_prompt_tokens=512; Jetson state is healthy and local backend is available,0.05,200
+loadtest-001,qa,medium,allow_remote,5,local,qwen35_08b_q4,local,true,task_type=qa fits local default policy; estimated_prompt_tokens=5 <= max_local_prompt_tokens=512; Jetson state is healthy and local backend is available,0.05,200
+loadtest-002,summary,low,allow_remote,20,local,qwen35_08b_q4,local,true,task_type=summary fits local default policy; estimated_prompt_tokens=20 <= max_local_prompt_tokens=512; Jetson state is healthy and local backend is available,0.05,200
+loadtest-003,summary,medium,allow_remote,8,local,qwen35_08b_q4,local,true,task_type=summary fits local default policy; estimated_prompt_tokens=8 <= max_local_prompt_tokens=512; Jetson state is healthy and local backend is available,0.03,200
+loadtest-004,,low,allow_remote,13,local,qwen35_08b_q4,local,true,task_type=qa fits local default policy; estimated_prompt_tokens=13 <= max_local_prompt_tokens=512; Jetson state is healthy and local backend is available,0.05,200
+loadtest-005,summary,medium,local_only,16,local,qwen35_08b_q4,local,true,privacy=local_only requires local execution; task fits local default policy,0.03,200
+loadtest-006,qa,medium,local_only,12,local,qwen35_08b_q4,local,true,privacy=local_only requires local execution; task fits local default policy,0.03,200
+loadtest-007,summary,medium,allow_remote,11,local,qwen35_08b_q4,local,true,task_type=summary fits local default policy; estimated_prompt_tokens=11 <= max_local_prompt_tokens=512; Jetson state is healthy and local backend is available,0.03,200
+loadtest-008,code,medium,allow_remote,11,remote,remote_large_model,remote,true,task_type=code benefits from stronger backend,0.03,200
+loadtest-009,code,medium,allow_remote,12,remote,remote_large_model,remote,true,task_type=code benefits from stronger backend,0.04,200
+loadtest-010,reasoning,medium,allow_remote,16,remote,remote_large_model,remote,true,task_type=reasoning benefits from stronger backend,0.04,200
+loadtest-011,reasoning,medium,allow_remote,14,remote,remote_large_model,remote,true,task_type=reasoning benefits from stronger backend,0.04,200
+loadtest-012,long_context,medium,allow_remote,840,remote,remote_large_model,remote,true,task_type=long_context benefits from stronger backend; estimated_prompt_tokens=840 exceeds max_local_prompt_tokens=512,0.04,200
+loadtest-013,qa,high,allow_remote,14,remote,remote_large_model,remote,true,quality=high requests stronger model,0.04,200
+loadtest-014,summary,high,allow_remote,8,remote,remote_large_model,remote,true,quality=high requests stronger model,0.04,200
+loadtest-015,,high,allow_remote,12,remote,remote_large_model,remote,true,quality=high requests stronger model,0.04,200
+loadtest-016,code,medium,local_only,10,local,qwen35_4b_q4,local,true,privacy=local_only requires local execution; task is complex for Jetson; routing locally with elevated risk,0.04,200
+loadtest-017,reasoning,medium,local_only,10,local,qwen35_4b_q4,local,true,privacy=local_only requires local execution; task is complex for Jetson; routing locally with elevated risk,0.04,200
+loadtest-018,code,medium,allow_remote,12,reject,,reject,true,latency_budget_ms=500 is too low for task_type=code; complex task would likely miss the latency budget,0.02,400
+loadtest-019,reasoning,high,allow_remote,12,reject,,reject,true,latency_budget_ms=500 is too low for task_type=reasoning; complex task would likely miss the latency budget,0.03,400
+loadtest-020,long_context,medium,allow_remote,5950,reject,,reject,true,estimated_prompt_tokens=5950 exceeds max_total_prompt_tokens=4096; request is too large for the MVP routing policy,0.03,400
+loadtest-021,qa,low,allow_remote,14,local,qwen35_08b_q4,local,true,task_type=qa fits local default policy; estimated_prompt_tokens=14 <= max_local_prompt_tokens=512; Jetson state is healthy and local backend is available,0.04,200
+loadtest-022,qa,low,allow_remote,14,local,qwen35_08b_q4,local,true,task_type=qa fits local default policy; estimated_prompt_tokens=14 <= max_local_prompt_tokens=512; Jetson state is healthy and local backend is available,0.04,200
+loadtest-023,qa,low,allow_remote,14,local,qwen35_08b_q4,local,true,task_type=qa fits local default policy; estimated_prompt_tokens=14 <= max_local_prompt_tokens=512; Jetson state is healthy and local backend is available,0.04,200
+loadtest-024,qa,low,allow_remote,14,local,qwen35_08b_q4,local,true,task_type=qa fits local default policy; estimated_prompt_tokens=14 <= max_local_prompt_tokens=512; Jetson state is healthy and local backend is available,0.04,200
+loadtest-025,qa,low,allow_remote,14,local,qwen35_08b_q4,local,true,task_type=qa fits local default policy; estimated_prompt_tokens=14 <= max_local_prompt_tokens=512; Jetson state is healthy and local backend is available,0.03,200
+loadtest-026,qa,low,allow_remote,14,local,qwen35_08b_q4,local,true,task_type=qa fits local default policy; estimated_prompt_tokens=14 <= max_local_prompt_tokens=512; Jetson state is healthy and local backend is available,0.03,200
+loadtest-027,qa,low,allow_remote,14,local,qwen35_08b_q4,local,true,task_type=qa fits local default policy; estimated_prompt_tokens=14 <= max_local_prompt_tokens=512; Jetson state is healthy and local backend is available,0.04,200
+loadtest-028,qa,low,allow_remote,14,local,qwen35_08b_q4,local,true,task_type=qa fits local default policy; estimated_prompt_tokens=14 <= max_local_prompt_tokens=512; Jetson state is healthy and local backend is available,0.03,200
+loadtest-029,qa,low,allow_remote,14,local,qwen35_08b_q4,local,true,task_type=qa fits local default policy; estimated_prompt_tokens=14 <= max_local_prompt_tokens=512; Jetson state is healthy and local backend is available,0.04,200

@@ -1,0 +1,95 @@
+from __future__ import annotations
+
+import time
+import uuid
+from pathlib import Path
+
+from .analyzer import analyze_request
+from .backends.base import Backend
+from .backends.llamacpp import LlamaCppBackend
+from .backends.mock import MockBackend
+from .metrics import DecisionLogger
+from .policy import PolicyEngine, RouterConfig
+from .schemas import ChatRequest, RouteDecision, RouterState, TaskAnalysis
+
+
+class TaskRouterService:
+    def __init__(self, config: RouterConfig, serving_root: Path):
+        self.config = config
+        self.policy = PolicyEngine(config)
+        self.serving_root = serving_root
+        self.logger = DecisionLogger(serving_root / "results/raw/routing_decisions.jsonl")
+        self.local_backend, self.remote_backend = self._build_backends()
+        self.local_queue_depth = 0
+        self.jetson_temp_c: float | None = 55.0
+
+    def _build_backends(self) -> tuple[Backend, Backend]:
+        if self.config.backend_mode == "llamacpp":
+            return (
+                LlamaCppBackend("local_llamacpp", self.config.local_base_url),
+                LlamaCppBackend("remote_llamacpp", self.config.remote_base_url),
+            )
+        return MockBackend("local_mock"), MockBackend("remote_mock")
+
+    def current_state(self, override: RouterState | None = None) -> RouterState:
+        if override is not None:
+            return override
+        return RouterState(
+            local_available=self.local_backend.available(),
+            remote_available=self.remote_backend.available(),
+            local_queue_depth=self.local_queue_depth,
+            jetson_temp_c=self.jetson_temp_c,
+        )
+
+    def route(self, request: ChatRequest) -> tuple[str, TaskAnalysis, RouteDecision, RouterState, float]:
+        start = time.perf_counter()
+        request_id = request.request_id or str(uuid.uuid4())
+        analysis = analyze_request(request)
+        state = self.current_state(request.state_override)
+        decision = self.policy.decide(request, analysis, state)
+        total_latency_ms = (time.perf_counter() - start) * 1000
+        return request_id, analysis, decision, state, total_latency_ms
+
+    def backend_for(self, decision: RouteDecision) -> Backend:
+        return self.local_backend if decision.route == "local" else self.remote_backend
+
+    def metrics(self) -> dict:
+        state = self.current_state()
+        snapshot = self.logger.snapshot()
+        snapshot.update(
+            {
+                "current_local_queue_depth": state.local_queue_depth,
+                "jetson_temp_c": state.jetson_temp_c,
+                "local_backend_available": state.local_available,
+                "remote_backend_available": state.remote_available,
+                "backend_mode": self.config.backend_mode,
+            }
+        )
+        return snapshot
+
+    def log_decision(
+        self,
+        *,
+        request_id: str,
+        request: ChatRequest,
+        analysis: TaskAnalysis,
+        decision: RouteDecision,
+        total_latency_ms: float,
+        status: str,
+        backend_latency_ms: float | None = None,
+    ) -> None:
+        self.logger.log(
+            {
+                "request_id": request_id,
+                "task_type": analysis.task_type,
+                "estimated_prompt_tokens": analysis.estimated_prompt_tokens,
+                "quality": request.quality,
+                "privacy": request.privacy,
+                "route": decision.route,
+                "selected_model": decision.selected_model,
+                "reasons": decision.reasons,
+                "backend_latency_ms": backend_latency_ms,
+                "total_latency_ms": round(total_latency_ms, 2),
+                "status": status,
+            }
+        )

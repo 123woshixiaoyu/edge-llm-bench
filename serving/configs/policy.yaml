@@ -1,0 +1,12 @@
+# Edge LLM Task Router MVP policy.
+# Default backend_mode is mock so the gateway can be tested without llama-server.
+backend_mode: mock
+local_llama_base_url: http://127.0.0.1:8080
+remote_llama_base_url: http://127.0.0.1:8081
+
+max_local_prompt_tokens: 512
+max_total_prompt_tokens: 4096
+local_queue_limit: 2
+max_jetson_temp_c: 75
+low_latency_budget_ms: 5000
+too_low_complex_latency_ms: 1500
