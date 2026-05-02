@@ -24,6 +24,11 @@ class TaskRouterService:
         self.jetson_temp_c: float | None = 55.0
 
     def _build_backends(self) -> tuple[Backend, Backend]:
+        if self.config.backend_mode == "hybrid":
+            return (
+                LlamaCppBackend("local_llamacpp", self.config.local_base_url),
+                MockBackend("remote_mock"),
+            )
         if self.config.backend_mode == "llamacpp":
             return (
                 LlamaCppBackend("local_llamacpp", self.config.local_base_url),

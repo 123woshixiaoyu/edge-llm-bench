@@ -176,3 +176,14 @@ Run policy and chat-path load tests:
 ```
 
 Current MVP result: both route-only and mock chat-path load tests match the expected route for 30/30 requests.
+
+v0.2 connects the Jetson local route to a real `llama-server` running Qwen3.5 0.8B Q4_K_M while keeping the remote route mocked as a placeholder. The real-local smoke test writes [serving/results/raw/real_local_backend_smoke.csv](serving/results/raw/real_local_backend_smoke.csv): 9/9 requests matched the expected route, and 4/4 local requests returned non-mock model output with backend latency around 1.3-1.5 seconds.
+
+Run the v0.2 hybrid gateway on Jetson after starting local `llama-server`:
+
+```bash
+EDGE_ROUTER_CONFIG_DIR=/home/rainbow/edge-llm-bench/serving/configs_llamacpp_local \
+python3 -m uvicorn serving.app.main:app --host 127.0.0.1 --port 8000
+
+python3 serving/scripts/smoke_real_local_backend.py --url http://127.0.0.1:8000
+```

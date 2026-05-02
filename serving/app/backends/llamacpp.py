@@ -46,7 +46,15 @@ class LlamaCppBackend:
                     error=f"llama.cpp backend returned HTTP {response.status_code}: {response.text[:300]}",
                 )
             data = response.json()
-            text = data.get("choices", [{}])[0].get("message", {}).get("content", "")
+            choice = data.get("choices", [{}])[0]
+            message = choice.get("message", {})
+            text = (
+                message.get("content")
+                or message.get("reasoning_content")
+                or message.get("reasoning")
+                or choice.get("text")
+                or ""
+            )
             return BackendResult(ok=True, text=text, latency_ms=latency_ms)
         except Exception as exc:
             latency_ms = (time.perf_counter() - start) * 1000

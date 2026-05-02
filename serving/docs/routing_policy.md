@@ -44,6 +44,8 @@ Default local model:
 qwen35_08b_q4
 ```
 
+In v0.2 this model can be backed by a real Jetson `llama-server` endpoint using the `hybrid` backend mode. In that configuration, local routes call Qwen3.5 0.8B Q4_K_M through llama.cpp instead of returning mock text.
+
 Quality-oriented local candidate:
 
 ```text
@@ -80,6 +82,8 @@ High-quality remote placeholder:
 ```text
 remote_large_model
 ```
+
+The v0.2 remote route remains a mock placeholder. It proves that the router can keep sending complex or high-quality tasks away from Jetson, but the real RTX backend is deliberately left for a later stage.
 
 ## Reject Rules
 
@@ -121,7 +125,7 @@ The MVP can grow in stages:
 - replace mocked queue depth with real in-process queue tracking;
 - parse `tegrastats` or a telemetry sidecar for thermal-aware routing;
 - add streaming support to `/v1/chat/completions`;
-- add real llama.cpp endpoints for local and remote backends;
+- add the real RTX llama.cpp endpoint for remote routes;
 - add per-task quality evaluation logs;
 - add camera/VLM routing later, with Gemma multimodal policy separated from text-only routing;
 - add concurrency tests and overload behavior once the single-request policy is stable.

@@ -71,6 +71,29 @@ The MVP includes two backend implementations:
 
 Default config uses mock mode so the router can be tested without starting llama-server.
 
+## v0.2 Real Jetson Local Backend
+
+v0.2 connects the local route to a real Jetson llama.cpp backend while keeping the remote route as a mock placeholder. The Jetson runs `llama-server` on Qwen3.5 0.8B Q4_K_M, the same Project 1 default chosen from the quantization decision study.
+
+Runtime shape:
+
+- local `llama-server`: `http://127.0.0.1:8080`
+- gateway: `http://127.0.0.1:8000`
+- router config: `serving/configs_llamacpp_local`
+- `backend_mode`: `hybrid`
+- local backend: `LlamaCppBackend`
+- remote backend: `MockBackend`
+
+This matters because the routing decision now controls an actual local inference path. Local `/v1/chat/completions` responses are real Qwen3.5 0.8B Q4 outputs instead of `[mock:local_mock]` text, and backend latency now includes real model inference time for local routes. Remote is still intentionally mocked until the RTX backend stage is started.
+
+Smoke verification writes:
+
+```text
+serving/results/raw/real_local_backend_smoke.csv
+```
+
+The v0.2 smoke run uses 9 requests: 4 local, 4 remote, and 1 reject. The local requests must return non-mock text from `llama-server`; remote requests are expected to return `[mock:remote_mock]` until the RTX backend is connected.
+
 ## Decision Logging
 
 Each request appends a JSON line to:
@@ -112,3 +135,16 @@ bash serving/scripts/run_gateway_jetson.sh
 ```
 
 The default gateway still uses mock backend unless `serving/configs/policy.yaml` is changed to `backend_mode: llamacpp` and llama-server endpoints are running.
+
+For v0.2 hybrid mode, start local llama-server first, then start the gateway with:
+
+```bash
+EDGE_ROUTER_CONFIG_DIR=/home/rainbow/edge-llm-bench/serving/configs_llamacpp_local \
+python3 -m uvicorn serving.app.main:app --host 127.0.0.1 --port 8000
+```
+
+Then run:
+
+```bash
+python3 serving/scripts/smoke_real_local_backend.py --url http://127.0.0.1:8000
+```
