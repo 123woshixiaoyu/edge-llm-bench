@@ -1,0 +1,33 @@
+# Third-party source and build artifacts
+llama.cpp/
+build/
+cmake-build-*/
+
+# Local model files are too large for git and may have separate licenses
+models/
+*.gguf
+*.safetensors
+*.bin
+*.pt
+*.pth
+
+# Raw logs can be regenerated from CSV summaries
+results/raw/logs/
+results/raw/*.log
+results/raw/*.pid
+results/raw/*dryrun*.csv
+
+# Python/editor noise
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.env
+.env.*
+.DS_Store
+.idea/
+.vscode/
+
+# Never commit credentials
+*token*
+*secret*

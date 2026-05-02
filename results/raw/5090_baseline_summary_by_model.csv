@@ -1,0 +1,7 @@
+model_key,model_name,quantization,cases,failures,model_size_gib,avg_prompt_tps,avg_decode_tps,max_peak_gpu_memory_mb,avg_max_gpu_power_w,max_gpu_temp_c,avg_load_time_ms,min_gpu_layers_offloaded,max_gpu_layers_total
+gemma4_e2b_q4_k_m,Gemma 4 E2B it,Q4_K_M,10,0,2.893,155.45,169.32,5192,94.93,56,370.75,36,36
+gemma4_e2b_q8_0,Gemma 4 E2B it,Q8_0,10,0,4.702,165.46,128.22,6189,107.43,56,350.10,36,36
+gemma4_e4b_q4_k_m,Gemma 4 E4B it,Q4_K_M,10,0,4.635,152.09,99.62,6581,100.22,55,377.29,43,43
+qwen35_4b_q4_k_m,Qwen3.5 4B,Q4_K_M,10,0,2.553,406.04,123.50,6222,108.91,56,137.99,33,33
+qwen35_4b_q8_0,Qwen3.5 4B,Q8_0,10,0,4.175,649.71,97.82,7825,109.91,60,86.11,33,33
+qwen35_08b_q4_k_m,Qwen3.5 0.8B,Q4_K_M,10,0,0.496,450.08,389.38,3865,103.62,59,119.79,25,25
