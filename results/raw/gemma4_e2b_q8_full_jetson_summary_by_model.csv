@@ -1,0 +1,2 @@
+model_key,model_name,quantization,cases,failures,model_size_gib,avg_prompt_tps,avg_decode_tps,max_peak_gpu_memory_mb,avg_max_gpu_power_w,max_gpu_temp_c,avg_load_time_ms,min_gpu_layers_offloaded,max_gpu_layers_total
+gemma4_e2b_q8_0,Gemma 4 E2B it,Q8_0,10,0,4.702,98.62,20.21,4485,20.58,67,553.09,36,36

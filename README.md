@@ -144,6 +144,9 @@ Representative Jetson run:
 | Model | Quant | Cases | Failures | Avg prompt tok/s | Avg decode tok/s | Peak memory MB | Avg max power W | Max temp C |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|
 | Gemma 4 E2B it | Q4_K_M | 10 | 0 | 146.26 | 32.68 | 3664 | 21.90 | 68 |
+| Gemma 4 E2B it | Q8_0 | 10 | 0 | 98.62 | 20.21 | 4485 | 20.58 | 67 |
 | Qwen3.5 0.8B | Q4_K_M | 10 | 0 | 396.76 | 57.56 | 2616 | 20.10 | 68 |
+
+Gemma 4 E2B Q8_0 is feasible on Jetson, but Q4_K_M is the better Gemma-side deployment candidate: it is smaller, faster, and uses less peak memory while preserving full GPU offload.
 
 Cross-hardware comparison: [results/figures/jetson_vs_5090.md](results/figures/jetson_vs_5090.md).

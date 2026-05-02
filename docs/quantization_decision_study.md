@@ -29,7 +29,7 @@ For this project, quantization is useful only if it improves the deployment deci
 
 ## Experiment Matrix
 
-Primary model: `Qwen/Qwen3.5-0.8B`, confirmed from the existing GGUF embedded base-model metadata and reproduced from the official Hugging Face source model.
+Primary PTQ model: `Qwen/Qwen3.5-0.8B`, confirmed from the existing GGUF embedded base-model metadata and reproduced from the official Hugging Face source model.
 
 | Artifact | Path | Size GiB |
 |---|---|---:|
@@ -54,6 +54,8 @@ Output files:
 - `results/raw/qwen35_08b_quant_quality_scores.csv`
 - `results/raw/qwen35_08b_quant_quality_long_samples.jsonl`
 - `results/raw/qwen35_08b_quant_quality_long_scores.csv`
+- `results/raw/gemma4_e2b_q8_full_jetson.csv`
+- `results/raw/gemma4_e2b_q8_full_jetson_summary_by_model.csv`
 
 ## Jetson Results
 
@@ -193,9 +195,20 @@ The 4B Q4 model is feasible on Jetson Orin Nano 8GB as a quality-oriented candid
 
 4B F16 and Q8 were not run on Jetson in this stage because this run is specifically scoped to Q4_K_M feasibility. Their local RTX results and file sizes suggest they are less appropriate for the 8GB Jetson default path.
 
-## Gemma 4 Note
+## Gemma 4 E2B Jetson Comparison
 
-Gemma 4 remains outside the main quantization decision line for now. The current local Gemma 4 setup uses prequantized text GGUF files plus a separate `mmproj-F16.gguf`. A fair Gemma 4 decision study would need multimodal validation with text GGUF, projector GGUF, and image or multimodal prompts. That is future work rather than a blocker for the Qwen3.5 PTQ decision.
+Gemma 4 is included as a non-Qwen medium model family and as a bridge toward future VLM work. The current local Gemma 4 setup uses prequantized text GGUF files plus a separate `mmproj-F16.gguf`; it is therefore a deployment comparison line, not a locally reproduced PTQ line like Qwen3.5.
+
+Gemma 4 E2B Q4_K_M was already part of the Jetson representative run. Gemma 4 E2B Q8_0 was then added on Jetson with the same 10-prompt representative set.
+
+| Model | Quant | Cases | Failures | Size GiB | Avg prompt tok/s | Avg decode tok/s | Peak memory MB | Avg max power W | Decode tok/s/W | Max temp C | GPU layers |
+|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| Gemma 4 E2B it | Q4_K_M | 10 | 0 | 2.893 | 146.26 | 32.68 | 3664 | 21.90 | 1.49 | 68 | 36/36 |
+| Gemma 4 E2B it | Q8_0 | 10 | 0 | 4.702 | 98.62 | 20.21 | 4485 | 20.58 | 0.98 | 67 | 36/36 |
+
+Gemma 4 E2B Q8_0 can run on Jetson Orin Nano 8GB with full GPU offload and zero failures, so it is feasible. However, it is not a good default: compared with Gemma 4 E2B Q4_K_M, it is about 1.81 GiB larger on disk, uses about 821 MB more peak memory, and decodes at only about 62% of Q4_K_M throughput. Its measured max power is slightly lower, but useful decode throughput per watt is also lower.
+
+This makes Gemma 4 E2B Q4_K_M the better Gemma-side deployment candidate on Jetson. It is slower than Qwen3.5 0.8B Q4_K_M, but it is a more realistic medium-model candidate and keeps Gemma 4 in the project as the path toward future multimodal camera experiments.
 
 ## Decision
 
@@ -225,6 +238,10 @@ Conditional option:
 
 **Qwen3.5 4B Q4_K_M** is feasible for the full 10-prompt Jetson representative run, but at 16.86 tok/s decode it is a quality-over-latency candidate, not the main low-latency recommendation.
 
+Non-Qwen medium-model option:
+
+**Gemma 4 E2B Q4_K_M** is the preferred Gemma-side Jetson candidate. It runs the full representative set with 32.68 tok/s decode and 3664 MB peak memory. Gemma 4 E2B Q8_0 is feasible, but its larger file size, higher peak memory, and lower decode throughput make it less attractive for the 8GB Jetson default path.
+
 ## Engineering Interpretation
 
 Jetson shows quantization value more clearly than RTX because it is constrained in the dimensions that matter for edge deployment: shared 8GB memory, lower memory bandwidth, lower power budget, and tighter thermal headroom. On RTX, all three 0.8B formats fit comfortably and run fast enough that the decision can look cosmetic. On Jetson, the same quantization step changes the product behavior: F16 is usable but slow, Q8 nearly doubles decode speed, and Q4 more than doubles decode speed while reducing peak memory.
@@ -237,6 +254,8 @@ Just running PTQ is not enough because a quantized file by itself does not answe
 - Quality: whether the quantized model still follows instructions and avoids obvious regressions.
 
 The final recommendation is therefore not "Q4 because smaller" or "Q8 because higher precision." It is Q4_K_M as the Jetson default because the measured system-level trade-off is best, with Q8_0 kept as a conservative fallback when output stability matters more than speed and memory.
+
+The Gemma 4 E2B result shows that this conclusion is not only a Qwen-specific artifact. On a medium non-Qwen model, Q4_K_M again gives the better edge deployment profile than Q8_0. Gemma also remains valuable because it connects the current text deployment benchmark to a future VLM path with `mmproj` and camera input.
 
 ## Lessons Learned
 
