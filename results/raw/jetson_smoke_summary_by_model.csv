@@ -1,0 +1,2 @@
+model_key,model_name,quantization,cases,failures,model_size_gib,avg_prompt_tps,avg_decode_tps,max_peak_gpu_memory_mb,avg_max_gpu_power_w,max_gpu_temp_c,avg_load_time_ms,min_gpu_layers_offloaded,max_gpu_layers_total
+qwen35_08b_q4_k_m,Qwen3.5 0.8B,Q4_K_M,1,0,0.496,120.24,56.55,2266,19.94,63,159.72,25,25

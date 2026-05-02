@@ -12,7 +12,7 @@ This project benchmarks quantized GGUF LLMs on a laptop GPU and an embedded Jets
   - Qwen3.5 0.8B: `Q4_K_M`
 - Hardware:
   - RTX 5090 Laptop 24GB via WSL2 Ubuntu 22.04
-  - Jetson Orin Nano 8GB, in progress
+  - Jetson Orin Nano 8GB representative benchmark
 - Out of scope for this phase: fine-tuning, QAT, serving platform, new model downloads
 
 ## Repository Layout
@@ -99,7 +99,7 @@ After smoke test passes, run the first real Jetson batch:
 
 ```bash
 MODEL_ROOT=~/models python3 scripts/run_benchmark.py \
-  --models qwen35_08b_q4_k_m,gemma4_e2b_q4_k_m,qwen35_4b_q4_k_m \
+  --models qwen35_08b_q4_k_m,gemma4_e2b_q4_k_m \
   --out results/raw/jetson_representative.csv \
   --log-dir results/raw/jetson_logs \
   --hardware "Jetson Orin Nano 8GB" \
@@ -111,6 +111,26 @@ python3 scripts/summarize_results.py \
   --out results/raw/jetson_representative_summary_by_model.csv
 ```
 
+Compare Jetson results with the RTX 5090 baseline:
+
+```bash
+python3 scripts/compare_hardware.py \
+  --base results/raw/5090_baseline_summary_by_model.csv \
+  --edge results/raw/jetson_representative_summary_by_model.csv \
+  --out results/figures/jetson_vs_5090.md \
+  --base-name "RTX 5090" \
+  --edge-name "Jetson Orin Nano"
+```
+
 ## Current Results
 
-See [docs/report.md](docs/report.md) for the latest RTX 5090 baseline and Jetson plan.
+See [docs/report.md](docs/report.md) for the full experiment report.
+
+Representative Jetson run:
+
+| Model | Quant | Cases | Failures | Avg prompt tok/s | Avg decode tok/s | Peak memory MB | Avg max power W | Max temp C |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| Gemma 4 E2B it | Q4_K_M | 10 | 0 | 146.26 | 32.68 | 3664 | 21.90 | 68 |
+| Qwen3.5 0.8B | Q4_K_M | 10 | 0 | 396.76 | 57.56 | 2616 | 20.10 | 68 |
+
+Cross-hardware comparison: [results/figures/jetson_vs_5090.md](results/figures/jetson_vs_5090.md).
