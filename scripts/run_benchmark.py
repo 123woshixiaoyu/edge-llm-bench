@@ -82,6 +82,36 @@ MODELS = [
         "quantization": "Q4_K_M",
         "path": model_path("qwen3.5/Qwen3.5-0.8B-Q4_K_M.gguf"),
     },
+    {
+        "model_key": "qwen35_08b_ptq_f16",
+        "model_name": "Qwen3.5 0.8B PTQ",
+        "quantization": "F16",
+        "path": model_path("quantized/qwen35_08b/qwen35_08b-f16.gguf"),
+    },
+    {
+        "model_key": "qwen35_08b_ptq_q8_0",
+        "model_name": "Qwen3.5 0.8B PTQ",
+        "quantization": "Q8_0",
+        "path": model_path("quantized/qwen35_08b/qwen35_08b-Q8_0.gguf"),
+    },
+    {
+        "model_key": "qwen35_08b_ptq_q4_k_m",
+        "model_name": "Qwen3.5 0.8B PTQ",
+        "quantization": "Q4_K_M",
+        "path": model_path("quantized/qwen35_08b/qwen35_08b-Q4_K_M.gguf"),
+    },
+    {
+        "model_key": "qwen35_4b_ptq_q8_0",
+        "model_name": "Qwen3.5 4B PTQ",
+        "quantization": "Q8_0",
+        "path": model_path("quantized/qwen35_4b/qwen35_4b-Q8_0.gguf"),
+    },
+    {
+        "model_key": "qwen35_4b_ptq_q4_k_m",
+        "model_name": "Qwen3.5 4B PTQ",
+        "quantization": "Q4_K_M",
+        "path": model_path("quantized/qwen35_4b/qwen35_4b-Q4_K_M.gguf"),
+    },
 ]
 
 
@@ -205,6 +235,12 @@ def model_size_gib(path: Path) -> float:
     return path.stat().st_size / (1024**3)
 
 
+def prompt_max_tokens(prompt: dict, args: argparse.Namespace) -> int:
+    if args.override_prompt_max_tokens:
+        return args.max_tokens
+    return prompt.get("max_tokens", args.max_tokens)
+
+
 def run_case(model: dict, prompt: dict, args: argparse.Namespace) -> dict:
     model_path = Path(model["path"])
     log_name = f"{datetime.now().strftime('%Y%m%d_%H%M%S')}_{model['model_key']}_{prompt['id']}.log"
@@ -219,7 +255,7 @@ def run_case(model: dict, prompt: dict, args: argparse.Namespace) -> dict:
         "-c",
         str(prompt.get("ctx_size", args.ctx_size)),
         "-n",
-        str(prompt.get("max_tokens", args.max_tokens)),
+        str(prompt_max_tokens(prompt, args)),
         "--temp",
         str(args.temperature),
         "-p",
@@ -277,7 +313,7 @@ def run_case(model: dict, prompt: dict, args: argparse.Namespace) -> dict:
         "prompt_category": prompt["category"],
         "prompt_language": prompt["language"],
         "context_length": prompt.get("ctx_size", args.ctx_size),
-        "requested_decode_tokens": prompt.get("max_tokens", args.max_tokens),
+        "requested_decode_tokens": prompt_max_tokens(prompt, args),
         "return_code": proc.returncode,
         "elapsed_wall_s": f"{elapsed_s:.3f}",
         "peak_gpu_memory_mb": max(mem_values) if mem_values else "",
@@ -320,6 +356,7 @@ def main() -> int:
     parser.add_argument("--log-dir", type=Path, default=DEFAULT_LOG_DIR)
     parser.add_argument("--ctx-size", type=int, default=4096)
     parser.add_argument("--max-tokens", type=int, default=96)
+    parser.add_argument("--override-prompt-max-tokens", action="store_true")
     parser.add_argument("--gpu-layers", type=int, default=99)
     parser.add_argument("--temperature", type=float, default=0.0)
     parser.add_argument("--timeout-s", type=int, default=240)
@@ -375,7 +412,7 @@ def main() -> int:
                     "prompt_category": prompt["category"],
                     "prompt_language": prompt["language"],
                     "context_length": prompt.get("ctx_size", args.ctx_size),
-                    "requested_decode_tokens": prompt.get("max_tokens", args.max_tokens),
+                    "requested_decode_tokens": prompt_max_tokens(prompt, args),
                     "return_code": "timeout",
                     "elapsed_wall_s": args.timeout_s,
                     "error_tail": str(exc),

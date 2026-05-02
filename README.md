@@ -1,19 +1,22 @@
 # Edge LLM Quantized Deployment Benchmark
 
-This project benchmarks quantized GGUF LLMs on a laptop GPU and an embedded Jetson device. The goal is to compare deployment trade-offs under edge constraints: model size, quantization format, prefill speed, decode speed, memory use, power, and temperature.
+This project studies quantized GGUF LLM deployment on a laptop GPU and an embedded Jetson device. The goal is to make engineering decisions under edge constraints: model size, quantization format, prefill speed, decode speed, memory use, power efficiency, temperature, and rough output quality.
 
 ## Current Scope
 
 - Backends: `llama.cpp` CUDA via `llama-completion`
+- Quantization pipeline: Hugging Face source model -> F16 GGUF -> `Q8_0` / `Q4_K_M` via `llama-quantize`
 - Models:
+  - Qwen3.5 0.8B PTQ: `F16`, `Q8_0`, `Q4_K_M`
+  - Qwen3.5 4B PTQ: `Q8_0`, `Q4_K_M`
   - Gemma 4 E2B IT: `Q4_K_M`, `Q8_0`
   - Gemma 4 E4B IT: `Q4_K_M`
   - Qwen3.5 4B: `Q4_K_M`, `Q8_0`
   - Qwen3.5 0.8B: `Q4_K_M`
 - Hardware:
   - RTX 5090 Laptop 24GB via WSL2 Ubuntu 22.04
-  - Jetson Orin Nano 8GB representative benchmark
-- Out of scope for this phase: fine-tuning, QAT, serving platform, new model downloads
+  - Jetson Orin Nano 8GB representative benchmark and quantization decision study
+- Out of scope for this phase: fine-tuning, QAT, serving platform, TensorRT, VLM camera demo
 
 ## Repository Layout
 
@@ -124,7 +127,17 @@ python3 scripts/compare_hardware.py \
 
 ## Current Results
 
-See [docs/report.md](docs/report.md) for the full experiment report.
+See [docs/report.md](docs/report.md) for the deployment benchmark report, [docs/quantization_pipeline.md](docs/quantization_pipeline.md) for the PTQ reproduction path, and [docs/quantization_decision_study.md](docs/quantization_decision_study.md) for the Jetson quantization decision study.
+
+Jetson Qwen3.5 0.8B quantization decision:
+
+| Quant | Cases | Failures | Size GiB | Avg decode tok/s | Peak memory MB | Avg max power W | Decode tok/s/W |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| F16 | 10 | 0 | 1.413 | 24.98 | 3677 | 18.93 | 1.32 |
+| Q8_0 | 10 | 0 | 0.756 | 47.10 | 2953 | 19.69 | 2.39 |
+| Q4_K_M | 10 | 0 | 0.493 | 56.54 | 2703 | 20.20 | 2.80 |
+
+Default Jetson recommendation: `Qwen3.5 0.8B Q4_K_M`. It is the smallest, fastest, lowest-memory 0.8B option in this study, with the best decode throughput per watt. `Q8_0` remains the conservative fallback when output stability matters more than latency and memory.
 
 Representative Jetson run:
 

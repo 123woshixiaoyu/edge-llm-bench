@@ -1,0 +1,4 @@
+model_key,model_name,quantization,cases,failures,model_size_gib,avg_prompt_tps,avg_decode_tps,max_peak_gpu_memory_mb,avg_max_gpu_power_w,max_gpu_temp_c,avg_load_time_ms,min_gpu_layers_offloaded,max_gpu_layers_total
+qwen35_08b_ptq_f16,Qwen3.5 0.8B PTQ,F16,10,0,1.413,410.07,234.01,5107,105.20,58,136.14,25,25
+qwen35_08b_ptq_q8_0,Qwen3.5 0.8B PTQ,Q8_0,10,0,0.756,619.16,315.88,4263,89.05,57,86.95,25,25
+qwen35_08b_ptq_q4_k_m,Qwen3.5 0.8B PTQ,Q4_K_M,10,0,0.493,534.88,354.49,3952,95.96,56,104.21,25,25
