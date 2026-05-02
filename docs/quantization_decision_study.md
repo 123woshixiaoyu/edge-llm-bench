@@ -172,17 +172,26 @@ This longer pass is still not a formal quality benchmark, but it gives a clearer
 - F16 was not clearly superior in this small sample. It also produced technical inaccuracies, so higher precision alone did not guarantee correctness for this small model.
 - No result here justifies changing the deployment recommendation away from Q4_K_M, but it does justify keeping Q8_0 as the quality-conservative fallback.
 
-## 4B Feasibility Smoke
+## 4B Representative Jetson Run
 
-After completing the 0.8B decision matrix, Qwen3.5 4B PTQ Q4_K_M was tested lightly on Jetson with 3 prompts.
+After completing the 0.8B decision matrix, Qwen3.5 4B PTQ Q4_K_M was tested on Jetson with the full 10-prompt representative set. This upgrades the earlier 3-prompt smoke test into a more useful feasibility run for the quality-oriented candidate model.
 
 | Model | Quant | Cases | Failures | Size GiB | Avg prompt tok/s | Avg decode tok/s | Peak memory MB | Avg max power W | Max temp C | GPU layers |
 |---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| Qwen3.5 4B PTQ | Q4_K_M | 3 | 0 | 2.523 | 160.55 | 16.73 | 4467 | 23.77 | 67 | 33/33 |
+| Qwen3.5 4B PTQ | Q4_K_M | 10 | 0 | 2.523 | 196.35 | 16.86 | 4549 | 23.91 | 72 | 33/33 |
 
-The 4B Q4 model can run on Jetson without OOM in this smoke test, but decode speed is much lower than 0.8B Q4_K_M. It may be useful when answer quality is more important than latency, but it is not the default low-latency recommendation for the Orin Nano 8GB.
+Full GPU offload succeeded for all runs: 33/33 layers. There were no OOMs, timeouts, or failed prompts. Peak memory reached 4549 MB, leaving less headroom than the 0.8B Q4_K_M run but still fitting on the Orin Nano 8GB under the current benchmark settings.
 
-4B F16 and Q8 were not run on Jetson in this stage because the project priority was to complete the 0.8B decision loop first. Their local RTX results and file sizes suggest they are less appropriate for the 8GB Jetson default path.
+Comparison with 0.8B Q4_K_M on Jetson:
+
+| Model | Quant | Avg prompt tok/s | Avg decode tok/s | Peak memory MB | Avg max power W | Max temp C | GPU layers |
+|---|---|---:|---:|---:|---:|---:|---:|
+| Qwen3.5 0.8B PTQ | Q4_K_M | 406.99 | 56.54 | 2703 | 20.20 | 68 | 25/25 |
+| Qwen3.5 4B PTQ | Q4_K_M | 196.35 | 16.86 | 4549 | 23.91 | 72 | 33/33 |
+
+The 4B Q4 model is feasible on Jetson Orin Nano 8GB as a quality-oriented candidate, but it should not replace Qwen3.5 0.8B Q4_K_M as the low-latency default unless the application can tolerate much lower decode throughput. Compared with 0.8B Q4_K_M, 4B Q4_K_M uses about 1.85 GB more peak memory, draws somewhat more power, reaches a higher max temperature, and decodes at roughly 30% of the 0.8B Q4_K_M speed.
+
+4B F16 and Q8 were not run on Jetson in this stage because this run is specifically scoped to Q4_K_M feasibility. Their local RTX results and file sizes suggest they are less appropriate for the 8GB Jetson default path.
 
 ## Gemma 4 Note
 
@@ -214,7 +223,7 @@ Not recommended as Jetson default:
 
 Conditional option:
 
-**Qwen3.5 4B Q4_K_M** is feasible for short Jetson runs, but at 16.73 tok/s decode it is a quality-over-latency candidate, not the main low-latency recommendation.
+**Qwen3.5 4B Q4_K_M** is feasible for the full 10-prompt Jetson representative run, but at 16.86 tok/s decode it is a quality-over-latency candidate, not the main low-latency recommendation.
 
 ## Engineering Interpretation
 
