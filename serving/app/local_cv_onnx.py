@@ -207,6 +207,83 @@ def _parse_detection_matrix(outputs: dict[str, Any], width: int, height: int, th
     return []
 
 
+class OnnxLocalCVDetector:
+    def __init__(
+        self,
+        *,
+        model_path: Path | None = None,
+        confidence_threshold: float = 0.2,
+        providers: list[str] | None = None,
+        warmup: int = 0,
+    ):
+        self.model_path = Path(model_path) if model_path else default_onnx_model_path()
+        self.confidence_threshold = confidence_threshold
+        self.providers = providers or ["CPUExecutionProvider"]
+        self.model_name = "ssd_mobilenet_v1_onnxruntime_cpu_reuse"
+
+        start_init = time.perf_counter()
+        import onnxruntime as ort
+
+        self.session = ort.InferenceSession(str(self.model_path), providers=self.providers)
+        self.input_meta = self.session.get_inputs()[0]
+        self.output_meta = self.session.get_outputs()
+        self.session_init_latency_ms = round((time.perf_counter() - start_init) * 1000, 2)
+        if warmup > 0:
+            self.warmup(warmup)
+
+    def warmup(self, iterations: int = 3) -> None:
+        import numpy as np
+
+        shape = [1 if not isinstance(dim, int) or dim <= 0 else dim for dim in self.input_meta.shape]
+        if len(shape) != 4:
+            return
+        dtype = np.uint8 if "uint8" in self.input_meta.type.lower() else np.float32
+        dummy = np.zeros(shape, dtype=dtype)
+        for _ in range(max(0, iterations)):
+            self.session.run(None, {self.input_meta.name: dummy})
+
+    def detect(self, image_path: Path) -> LocalCVResult:
+        start_total = time.perf_counter()
+        if not Path(image_path).exists():
+            return LocalCVResult(False, self.model_name, str(self.model_path.parent), [], [], None, None, f"image not found: {image_path}")
+
+        try:
+            import cv2
+        except Exception as exc:
+            return LocalCVResult(False, self.model_name, str(self.model_path.parent), [], [], None, None, f"opencv import failed: {exc}")
+
+        image = cv2.imread(str(image_path))
+        if image is None:
+            return LocalCVResult(False, self.model_name, str(self.model_path.parent), [], [], None, None, f"failed to read image: {image_path}")
+        height, width = image.shape[:2]
+
+        try:
+            input_tensor = _prepare_input(image, self.input_meta)
+            start_infer = time.perf_counter()
+            raw_outputs = self.session.run(None, {self.input_meta.name: input_tensor})
+            inference_latency_ms = (time.perf_counter() - start_infer) * 1000
+            outputs = {meta.name: value for meta, value in zip(self.output_meta, raw_outputs)}
+            detections = _parse_tf_style_outputs(outputs, width, height, self.confidence_threshold)
+            if not detections:
+                detections = _parse_detection_matrix(outputs, width, height, self.confidence_threshold)
+        except Exception as exc:
+            return LocalCVResult(False, self.model_name, str(self.model_path.parent), [], [], None, None, f"ONNXRuntime inference failed: {exc}")
+
+        detections.sort(key=lambda detection: detection.confidence, reverse=True)
+        labels = sorted({detection.label for detection in detections}) or ["no_detection"]
+        total_latency_ms = (time.perf_counter() - start_total) * 1000
+        return LocalCVResult(
+            ok=True,
+            model=self.model_name,
+            model_dir=str(self.model_path.parent),
+            detected_labels=labels,
+            detections=detections,
+            inference_latency_ms=round(inference_latency_ms, 2),
+            total_latency_ms=round(total_latency_ms, 2),
+            error="",
+        )
+
+
 def run_ssd_mobilenet_onnx(
     image_path: Path,
     *,
@@ -234,7 +311,9 @@ def run_ssd_mobilenet_onnx(
     height, width = image.shape[:2]
 
     try:
+        start_init = time.perf_counter()
         session = ort.InferenceSession(str(model_path), providers=["CPUExecutionProvider"])
+        session_init_latency_ms = (time.perf_counter() - start_init) * 1000
         input_meta = session.get_inputs()[0]
         input_tensor = _prepare_input(image, input_meta)
         start_infer = time.perf_counter()
@@ -250,7 +329,7 @@ def run_ssd_mobilenet_onnx(
     detections.sort(key=lambda detection: detection.confidence, reverse=True)
     labels = sorted({detection.label for detection in detections}) or ["no_detection"]
     total_latency_ms = (time.perf_counter() - start_total) * 1000
-    return LocalCVResult(
+    result = LocalCVResult(
         ok=True,
         model=model_name,
         model_dir=str(model_path.parent),
@@ -260,6 +339,8 @@ def run_ssd_mobilenet_onnx(
         total_latency_ms=round(total_latency_ms, 2),
         error="",
     )
+    result.session_init_latency_ms = round(session_init_latency_ms, 2)
+    return result
 
 
 def detections_json(detections: list[Detection]) -> str:

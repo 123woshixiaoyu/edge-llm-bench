@@ -40,6 +40,9 @@ def summarize(rows: list[dict]) -> list[dict]:
         successes = [row for row in group if str(row.get("ok", "")).lower() == "true"]
         latencies = [value for row in successes if (value := as_float(row.get("inference_latency_ms", ""))) is not None]
         total_latencies = [value for row in successes if (value := as_float(row.get("total_latency_ms", ""))) is not None]
+        session_init_latencies = [
+            value for row in group if (value := as_float(row.get("session_init_latency_ms", ""))) is not None
+        ]
         labels = [row.get("detected_labels", "") for row in successes]
         label_counter = Counter(labels)
         mode_labels, mode_count = label_counter.most_common(1)[0] if label_counter else ("", 0)
@@ -60,6 +63,10 @@ def summarize(rows: list[dict]) -> list[dict]:
                 "min_latency_ms": round(min(latencies), 2) if latencies else "",
                 "max_latency_ms": round(max(latencies), 2) if latencies else "",
                 "avg_total_latency_ms": round(statistics.mean(total_latencies), 2) if total_latencies else "",
+                "avg_session_init_latency_ms": round(statistics.mean(session_init_latencies), 2)
+                if session_init_latencies
+                else "",
+                "max_session_init_latency_ms": round(max(session_init_latencies), 2) if session_init_latencies else "",
                 "errors": " | ".join(errors),
             }
         )
@@ -92,6 +99,8 @@ def main() -> int:
         "min_latency_ms",
         "max_latency_ms",
         "avg_total_latency_ms",
+        "avg_session_init_latency_ms",
+        "max_session_init_latency_ms",
         "errors",
     ]
     with args.out.open("w", newline="", encoding="utf-8") as f:

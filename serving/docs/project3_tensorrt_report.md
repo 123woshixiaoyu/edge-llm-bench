@@ -67,6 +67,7 @@ CSV outputs:
 
 - `serving/results/raw/local_cv_runtime_baseline.csv`
 - `serving/results/raw/local_cv_onnx_baseline.csv`
+- `serving/results/raw/local_cv_onnx_reuse_baseline.csv`
 - `serving/results/raw/local_cv_tensorrt_fp16.csv`
 - `serving/results/raw/local_cv_runtime_summary.csv`
 
@@ -76,9 +77,28 @@ Summary:
 |---|---|---:|---:|---:|---|---:|---:|---:|---:|---:|
 | OpenCV DNN | `mobilenet_ssd_voc_opencv_dnn` | 30 | 30 | 1.0 | `["chair"]` | 90.71 | 91.79 | 95.87 | 97.12 | 127.83 |
 | ONNXRuntime CPU | `ssd_mobilenet_v1_onnxruntime_cpu` | 30 | 30 | 1.0 | `["bed", "chair"]` | 53.23 | 52.12 | 60.92 | 71.91 | 4929.98 |
+| ONNXRuntime CPU reuse | `ssd_mobilenet_v1_onnxruntime_cpu_reuse` | 30 | 30 | 1.0 | `["bed", "chair"]` | 42.02 | 40.96 | 41.67 | 61.82 | 49.04 |
 | TensorRT FP16 | `ssd_mobilenet_v1_tensorrt_fp16` | 1 | 0 | 0.0 | n/a | n/a | n/a | n/a | n/a | n/a |
 
 The ONNXRuntime inference step is faster than the OpenCV DNN forward pass on this image, but its total time is much larger because the current adapter creates a new ONNXRuntime session on each benchmark iteration. That is a useful engineering signal: production ONNX inference should keep the session resident, just like a production TensorRT path should keep the engine loaded.
+
+## Phase 1.5: ONNXRuntime Session Reuse
+
+Phase 1.5 isolates ONNXRuntime session creation from per-request inference. The code now provides `OnnxLocalCVDetector`, which creates `onnxruntime.InferenceSession` once in `__init__`, optionally runs warmup, and reuses the session in `detect(image_path)`.
+
+This is a serving adapter optimization, not a model architecture optimization. The model file and detection logic are unchanged.
+
+Phase 1.5 result:
+
+| Metric | Old ONNX per-request session | Reused ONNX session |
+|---|---:|---:|
+| Session init latency | included in every request | `4907.15 ms` one-time startup |
+| Avg inference latency | `53.23 ms` | `42.02 ms` |
+| P95 inference latency | `60.92 ms` | `41.67 ms` |
+| Avg total latency | `4929.98 ms` | `49.04 ms` |
+| Detection consistency | `1.0` | `1.0` |
+
+The old result made ONNXRuntime look unusable for serving because each request paid a roughly five-second session creation cost. With session reuse, total latency drops close to the actual inference latency. This demonstrates that the bottleneck was the adapter lifecycle, not the ONNX graph itself.
 
 ## Detection Consistency
 
@@ -96,6 +116,13 @@ chair, confidence 0.3669
 ```
 
 The label set is not identical because the ONNX model is an SSD-MobileNetV1 COCO model while the v0.5 baseline is a MobileNet-SSD VOC Caffe model. The important Phase 1 result is that both paths consistently detect a chair-like object on the same frame, and the ONNX path produces deterministic structured output.
+
+ONNXRuntime session reuse kept the same stable label set:
+
+```text
+bed, confidence 0.8927
+chair, confidence 0.3669
+```
 
 ## TensorRT FP16 Blocker
 

@@ -331,6 +331,13 @@ python3 serving/scripts/benchmark_local_cv_runtimes.py \
   --out serving/results/raw/local_cv_onnx_baseline.csv
 
 python3 serving/scripts/benchmark_local_cv_runtimes.py \
+  --runtime onnxruntime_cpu_reuse \
+  --image results/figures/camera_v05_positive_detection.jpg \
+  --iterations 30 \
+  --warmup 3 \
+  --out serving/results/raw/local_cv_onnx_reuse_baseline.csv
+
+python3 serving/scripts/benchmark_local_cv_runtimes.py \
   --runtime tensorrt_fp16 \
   --image results/figures/camera_v05_positive_detection.jpg \
   --iterations 30 \
@@ -339,6 +346,7 @@ python3 serving/scripts/benchmark_local_cv_runtimes.py \
 python3 serving/scripts/summarize_local_cv_runtimes.py \
   serving/results/raw/local_cv_runtime_baseline.csv \
   serving/results/raw/local_cv_onnx_baseline.csv \
+  serving/results/raw/local_cv_onnx_reuse_baseline.csv \
   serving/results/raw/local_cv_tensorrt_fp16.csv \
   --out serving/results/raw/local_cv_runtime_summary.csv
 ```
@@ -349,7 +357,10 @@ Current Phase 1 summary:
 |---|---:|---:|---:|---|---:|---:|---:|
 | OpenCV DNN | 30 | 30 | 1.0 | `["chair"]` | 90.71 | 95.87 | 127.83 |
 | ONNXRuntime CPU | 30 | 30 | 1.0 | `["bed", "chair"]` | 53.23 | 60.92 | 4929.98 |
+| ONNXRuntime CPU reuse | 30 | 30 | 1.0 | `["bed", "chair"]` | 42.02 | 41.67 | 49.04 |
 | TensorRT FP16 | 1 | 0 | 0.0 | n/a | n/a | n/a | n/a |
+
+Phase 1.5 shows that the earlier ONNXRuntime total latency problem was session lifecycle overhead: reusable session initialization costs about `4907.15 ms` once, then per-request total latency drops from `4929.98 ms` to `49.04 ms`.
 
 TensorRT FP16 is currently blocked by missing Jetson TensorRT packages: `trtexec` is not installed. The Jetson apt source reports candidate `tensorrt 10.3.0.30-1+cuda12.5`; after installing it, run:
 
