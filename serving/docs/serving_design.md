@@ -94,6 +94,41 @@ serving/results/raw/real_local_backend_smoke.csv
 
 The v0.2 smoke run uses 9 requests: 4 local, 4 remote, and 1 reject. The local requests must return non-mock text from `llama-server`; remote requests are expected to return `[mock:remote_mock]` until the RTX backend is connected.
 
+## v0.3 Real RTX Remote Backend
+
+v0.3 connects the remote route to a real RTX 5090 `llama-server` running Qwen3.5 4B Q4_K_M. The router now exercises the complete heterogeneous loop:
+
+```mermaid
+flowchart TD
+    A["User / app text request"] --> B["Jetson FastAPI gateway"]
+    B --> C["Task analyzer"]
+    C --> D["Policy engine"]
+    D -->|short QA / summary / privacy| E["Jetson llama-server<br/>Qwen3.5 0.8B Q4_K_M<br/>127.0.0.1:8080"]
+    D -->|code / reasoning / high quality| F["RTX 5090 llama-server<br/>Qwen3.5 4B Q4_K_M<br/>WSL 127.0.0.1:8081"]
+    D -->|unsafe or impossible| G["Reject"]
+    E --> H["Decision log + response"]
+    F --> H
+    G --> H
+```
+
+Runtime shape used for the smoke test:
+
+- Jetson local backend: `http://127.0.0.1:8080`
+- RTX remote backend: Qwen3.5 4B Q4_K_M on WSL, listening on `0.0.0.0:8081`
+- Jetson remote access path: `http://127.0.0.1:18081` through an SSH reverse tunnel to RTX/WSL `127.0.0.1:8081`
+- gateway config: `serving/configs_dual_llamacpp`
+- `backend_mode`: `llamacpp`
+
+The SSH reverse tunnel is a deployment workaround for the current Windows/WSL networking setup: the RTX server is reachable from Windows on `127.0.0.1:8081`, but the laptop LAN IP did not expose that WSL port to Jetson. The tunnel keeps the v0.3 router semantics intact: remote routes still execute on the RTX 5090 model, not on Jetson.
+
+Smoke verification writes:
+
+```text
+serving/results/raw/dual_real_backend_smoke.csv
+```
+
+The v0.3 smoke run uses 11 requests: 4 local, 6 remote, and 1 reject. Both local and remote successful responses must be non-mock.
+
 ## Decision Logging
 
 Each request appends a JSON line to:
@@ -147,4 +182,26 @@ Then run:
 
 ```bash
 python3 serving/scripts/smoke_real_local_backend.py --url http://127.0.0.1:8000
+```
+
+For v0.3 dual real backend mode, start the RTX remote server on the laptop/WSL side:
+
+```bash
+cd /mnt/d/AI/edge-llm-bench
+HOST=0.0.0.0 PORT=8081 bash serving/scripts/run_remote_llama_server_5090.sh
+```
+
+If Jetson cannot reach the laptop LAN IP directly, create the reverse tunnel from WSL:
+
+```bash
+ssh -N -R 18081:127.0.0.1:8081 rainbow@192.168.1.102
+```
+
+Then start the Jetson gateway with:
+
+```bash
+EDGE_ROUTER_CONFIG_DIR=/home/rainbow/edge-llm-bench/serving/configs_dual_llamacpp \
+python3 -m uvicorn serving.app.main:app --host 127.0.0.1 --port 8000
+
+python3 serving/scripts/smoke_dual_real_backends.py --url http://127.0.0.1:8000
 ```

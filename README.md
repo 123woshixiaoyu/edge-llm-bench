@@ -187,3 +187,20 @@ python3 -m uvicorn serving.app.main:app --host 127.0.0.1 --port 8000
 
 python3 serving/scripts/smoke_real_local_backend.py --url http://127.0.0.1:8000
 ```
+
+v0.3 connects the remote route to a real RTX 5090 `llama-server` running Qwen3.5 4B Q4_K_M. The Jetson gateway now supports the full heterogeneous loop: short/private QA and summary tasks run on Jetson 0.8B Q4, while code/reasoning/high-quality tasks route to RTX 4B Q4. In the current WSL networking setup, Windows exposes the WSL server on `127.0.0.1:8081` but not directly on the laptop LAN IP, so the Jetson smoke run used an SSH reverse tunnel:
+
+```text
+Jetson 127.0.0.1:18081 -> RTX/WSL 127.0.0.1:8081
+```
+
+Run the v0.3 gateway on Jetson after starting local `llama-server`, remote RTX `llama-server`, and the tunnel:
+
+```bash
+EDGE_ROUTER_CONFIG_DIR=/home/rainbow/edge-llm-bench/serving/configs_dual_llamacpp \
+python3 -m uvicorn serving.app.main:app --host 127.0.0.1 --port 8000
+
+python3 serving/scripts/smoke_dual_real_backends.py --url http://127.0.0.1:8000
+```
+
+The v0.3 smoke test writes [serving/results/raw/dual_real_backend_smoke.csv](serving/results/raw/dual_real_backend_smoke.csv): 11/11 requests matched the expected route, 4/4 local requests returned non-mock Jetson model output, and 6/6 remote requests returned non-mock RTX model output.

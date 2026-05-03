@@ -1,0 +1,8 @@
+local:
+  default: qwen35_08b_q4
+  quality: qwen35_4b_q4
+  medium_candidate: gemma4_e2b_q4
+
+remote:
+  default: qwen35_4b_q4
+  high_quality: qwen35_4b_q4

@@ -85,6 +85,14 @@ remote_large_model
 
 The v0.2 remote route remains a mock placeholder. It proves that the router can keep sending complex or high-quality tasks away from Jetson, but the real RTX backend is deliberately left for a later stage.
 
+In v0.3 the remote route can be backed by a real RTX 5090 `llama-server` running Qwen3.5 4B Q4_K_M. The router still uses the same policy triggers, but the action changes from placeholder behavior to actual heterogeneous inference:
+
+- simple QA, short summary, and `privacy=local_only` stay on Jetson;
+- code, reasoning, long-context, and `quality=high` tasks go to RTX when privacy allows;
+- impossible latency budgets and unsafe fallback cases are still rejected.
+
+Engineering reason: Jetson should keep low-latency and privacy-sensitive work near the edge, while RTX absorbs tasks that benefit from the larger 4B model and higher compute budget.
+
 ## Reject Rules
 
 A request should be rejected when:
@@ -125,7 +133,7 @@ The MVP can grow in stages:
 - replace mocked queue depth with real in-process queue tracking;
 - parse `tegrastats` or a telemetry sidecar for thermal-aware routing;
 - add streaming support to `/v1/chat/completions`;
-- add the real RTX llama.cpp endpoint for remote routes;
+- replace the SSH tunnel with a production network path or service discovery entry;
 - add per-task quality evaluation logs;
 - add camera/VLM routing later, with Gemma multimodal policy separated from text-only routing;
 - add concurrency tests and overload behavior once the single-request policy is stable.
