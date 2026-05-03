@@ -1,0 +1,2 @@
+runtime,model_name,image_path,iteration,detected_labels,detections,confidence,inference_latency_ms,total_latency_ms,ok,error
+tensorrt_fp16,ssd_mobilenet_v1_tensorrt_fp16,/home/rainbow/edge-llm-bench/results/figures/camera_v05_positive_detection.jpg,1,[],[],,,,False,TensorRT trtexec is not installed; install TensorRT packages and rebuild the FP16 engine

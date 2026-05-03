@@ -264,6 +264,7 @@ Vision design docs:
 - [serving/docs/vision_routing_design.md](serving/docs/vision_routing_design.md)
 - [serving/docs/real_vlm_backend.md](serving/docs/real_vlm_backend.md)
 - [serving/docs/project3_tensorrt_plan.md](serving/docs/project3_tensorrt_plan.md)
+- [serving/docs/project3_tensorrt_report.md](serving/docs/project3_tensorrt_report.md)
 
 v0.5b replaces the remote VLM placeholder with a real RTX/WSL VLM backend while keeping the same camera-aware policy. Local detect/classify tasks still run on Jetson MobileNet-SSD; scene description, VQA, and high-quality visual tasks route to the RTX VLM when privacy allows; `privacy=local_only` semantic vision tasks are rejected instead of sending images off-device.
 
@@ -309,3 +310,51 @@ Current v0.5b result:
 - remote VLM latency range: about `19.2-20.0 s` per remote call
 
 Images are sent to the RTX backend as base64 in the HTTP request, not as local file paths, because Jetson paths are not readable from WSL.
+
+## Project 3: Local CV ONNX / TensorRT Optimization
+
+Project 3 starts from the v0.5 local CV path and measures runtime choices for Jetson deployment. Phase 1 keeps the MobileNet-SSD Caffe OpenCV DNN model as the v0.5 baseline, then uses an ONNX Model Zoo SSD-MobileNetV1 model for ONNXRuntime and the TensorRT FP16 build path. This keeps the detector family close to the current baseline without relying on brittle Caffe-to-ONNX conversion.
+
+Run the fixed-image runtime benchmarks on Jetson:
+
+```bash
+python3 serving/scripts/benchmark_local_cv_runtimes.py \
+  --runtime opencv_dnn \
+  --image results/figures/camera_v05_positive_detection.jpg \
+  --iterations 30 \
+  --out serving/results/raw/local_cv_runtime_baseline.csv
+
+python3 serving/scripts/benchmark_local_cv_runtimes.py \
+  --runtime onnxruntime \
+  --image results/figures/camera_v05_positive_detection.jpg \
+  --iterations 30 \
+  --out serving/results/raw/local_cv_onnx_baseline.csv
+
+python3 serving/scripts/benchmark_local_cv_runtimes.py \
+  --runtime tensorrt_fp16 \
+  --image results/figures/camera_v05_positive_detection.jpg \
+  --iterations 30 \
+  --out serving/results/raw/local_cv_tensorrt_fp16.csv
+
+python3 serving/scripts/summarize_local_cv_runtimes.py \
+  serving/results/raw/local_cv_runtime_baseline.csv \
+  serving/results/raw/local_cv_onnx_baseline.csv \
+  serving/results/raw/local_cv_tensorrt_fp16.csv \
+  --out serving/results/raw/local_cv_runtime_summary.csv
+```
+
+Current Phase 1 summary:
+
+| Runtime | Runs | Success | Detection consistency | Mode labels | Avg inference ms | P95 ms | Avg total ms |
+|---|---:|---:|---:|---|---:|---:|---:|
+| OpenCV DNN | 30 | 30 | 1.0 | `["chair"]` | 90.71 | 95.87 | 127.83 |
+| ONNXRuntime CPU | 30 | 30 | 1.0 | `["bed", "chair"]` | 53.23 | 60.92 | 4929.98 |
+| TensorRT FP16 | 1 | 0 | 0.0 | n/a | n/a | n/a | n/a |
+
+TensorRT FP16 is currently blocked by missing Jetson TensorRT packages: `trtexec` is not installed. The Jetson apt source reports candidate `tensorrt 10.3.0.30-1+cuda12.5`; after installing it, run:
+
+```bash
+serving/scripts/build_local_cv_trt_engine.sh
+```
+
+INT8 calibration is deferred to Project 3 Phase 2.

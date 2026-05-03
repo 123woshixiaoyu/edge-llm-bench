@@ -1,0 +1,4 @@
+runtime,model,runs,success_count,detection_consistency,mode_detected_labels,avg_latency_ms,p50_latency_ms,p95_latency_ms,p99_latency_ms,min_latency_ms,max_latency_ms,avg_total_latency_ms,errors
+onnxruntime,ssd_mobilenet_v1_onnxruntime_cpu,30,30,1.0,"[""bed"", ""chair""]",53.23,52.12,60.92,71.91,48.98,74.01,4929.98,
+opencv_dnn,mobilenet_ssd_voc_opencv_dnn,30,30,1.0,"[""chair""]",90.71,91.79,95.87,97.12,77.67,97.63,127.83,
+tensorrt_fp16,ssd_mobilenet_v1_tensorrt_fp16,1,0,0.0,,,,,,,,,TensorRT trtexec is not installed; install TensorRT packages and rebuild the FP16 engine

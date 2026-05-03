@@ -50,27 +50,51 @@ Project 3 should measure:
 - power and temperature through `tegrastats`;
 - detection count and basic label consistency on a fixed image set.
 
+## Phase 1 Update
+
+Phase 1 keeps MobileNet-SSD as the v0.5 local CV baseline and uses an ONNX Model Zoo SSD-MobileNetV1 model for ONNXRuntime / TensorRT feasibility:
+
+```text
+/home/rainbow/models/vision/ssd_mobilenet_onnx/ssd_mobilenet_v1_10.onnx
+```
+
+This avoids brittle Caffe-to-ONNX conversion while staying in the same SSD-MobileNet detector family. YOLO-nano remains a backup option for a future phase, but it was not needed for Phase 1.
+
+Phase 1 outputs:
+
+- `serving/results/raw/local_cv_runtime_baseline.csv`
+- `serving/results/raw/local_cv_onnx_baseline.csv`
+- `serving/results/raw/local_cv_tensorrt_fp16.csv`
+- `serving/results/raw/local_cv_runtime_summary.csv`
+- `serving/docs/project3_tensorrt_report.md`
+
 ## ONNX Plan
 
-Preferred path:
+Current path:
 
-- use an ONNX equivalent of the v0.5 local detector, or convert the detector through a reproducible script;
-- keep input size fixed at `300x300` for the first pass;
+- use ONNX Model Zoo SSD-MobileNetV1 as the ONNX optimization target;
 - store ONNX model files under `/home/rainbow/models/vision/`, not in git;
-- validate that ONNXRuntime produces similar labels on the same camera smoke image and a small fixed calibration image set.
-
-If MobileNet-SSD Caffe-to-ONNX conversion becomes too brittle, choose a newer small detector with first-class ONNX export, such as YOLOv8n or YOLO11n. That model switch should be recorded as a Project 3 decision, not hidden inside v0.5.
+- run ONNXRuntime CPU first to prove model loading, preprocessing, output parsing, and deterministic detections;
+- compare detection consistency against the v0.5 positive camera sample.
 
 ## TensorRT FP16 Plan
 
 Steps:
 
-1. Export or obtain ONNX.
-2. Build TensorRT FP16 engine on Jetson.
+1. Use the SSD-MobileNetV1 ONNX model from Phase 1.
+2. Install TensorRT packages on Jetson if missing.
+3. Build TensorRT FP16 engine on Jetson.
 3. Benchmark the same image set used for ONNXRuntime.
 4. Compare latency, memory, and power against OpenCV DNN and ONNXRuntime.
 
 Expected benefit: lower inference latency and better throughput on Jetson GPU, with minimal accuracy change relative to FP32/ONNX.
+
+Current Phase 1 blocker:
+
+```text
+trtexec not found
+TensorRT apt candidate: tensorrt 10.3.0.30-1+cuda12.5
+```
 
 ## TensorRT INT8 Plan
 
