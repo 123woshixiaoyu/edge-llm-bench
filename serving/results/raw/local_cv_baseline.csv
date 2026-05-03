@@ -1,0 +1,2 @@
+image_path,camera_backend,resolution,capture_latency_ms,local_cv_model,model_dir,detected_labels,detections,local_cv_latency_ms,local_cv_total_latency_ms,ok,error
+results/figures/camera_v05_sample.jpg,GStreamer Argus,1280x720,1209.47,mobilenet_ssd_voc_opencv_dnn,/home/rainbow/models/vision/mobilenet_ssd,"[""no_detection""]",[],76.59,247.71,True,

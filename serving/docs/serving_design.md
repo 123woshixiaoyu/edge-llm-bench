@@ -150,6 +150,37 @@ serving/results/raw/dual_real_backend_load_test_summary.csv
 serving/results/raw/failure_modes_smoke.csv
 ```
 
+## v0.5a Camera + Local CV Routing
+
+v0.5a adds a camera-aware path without changing the existing text endpoints. The text router remains responsible for `/v1/route` and `/v1/chat/completions`; the first vision path is script-driven so the camera and local CV stack can be validated before becoming an API surface.
+
+Runtime shape:
+
+```mermaid
+flowchart TD
+    A["Jetson IMX219 CSI camera"] --> B["GStreamer Argus capture"]
+    B --> C["OpenCV DNN MobileNet-SSD"]
+    C --> D["Vision policy"]
+    D -->|detect / classify| E["Local CV result"]
+    D -->|VQA / scene description, privacy allows| F["Remote VLM placeholder"]
+    D -->|privacy conflict| G["Reject"]
+    E --> H["vision_router_smoke.csv"]
+    F --> H
+    G --> H
+```
+
+The validated camera path is IMX219 on CAM1, configured as `Camera IMX219-C` on `Header 2: Jetson 24pin CSI Connector`. Camera capture is real, using `GStreamer Argus`; local CV is real, using MobileNet-SSD through OpenCV DNN. Remote VLM remains a mock placeholder and is explicitly marked with `remote_is_mock=true`.
+
+v0.5a writes:
+
+```text
+results/figures/camera_v05_sample.jpg
+serving/results/raw/local_cv_baseline.csv
+serving/results/raw/vision_router_smoke.csv
+```
+
+Current smoke result: 10/10 expected routes matched, with local `4`, remote `4`, and reject `2`. The local CV inference latency was about 76.6 ms on the captured 1280x720 frame after resizing to the model input.
+
 ## Decision Logging
 
 Each request appends a JSON line to:
@@ -167,7 +198,8 @@ The log records timestamp, request id, task type, estimated tokens, quality, pri
 - The policy is intentionally simple and explainable.
 - No streaming responses yet.
 - No real concurrent queue or admission control.
-- No TensorRT, vLLM, VLM, camera, or multimodal routing.
+- No TensorRT, vLLM, real VLM, video stream, or multimodal API endpoint.
+- v0.5a camera routing is script-driven; an HTTP vision API is future work.
 - The load test evaluates policy agreement, not model quality.
 
 ## Run Locally

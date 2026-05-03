@@ -227,10 +227,27 @@ python3 serving/scripts/smoke_failure_modes.py \
   --url http://127.0.0.1:8000
 ```
 
-v0.5 prep is limited to camera smoke. It only checks whether Jetson can open a camera and capture one non-sensitive frame:
+v0.5a adds camera-aware edge routing while keeping the text router intact. Camera capture is real, local CV is real, and remote VLM remains a marked placeholder for v0.5b.
 
 ```bash
 python3 scripts/camera_smoke.py
+python3 serving/scripts/smoke_vision_router.py
 ```
 
-Current v0.4 reliability result: `40` concurrent-load requests at concurrency `4`, `40/40` expected routes matched, `0` backend errors, `0` timeouts. Current v0.5 prep camera smoke did not capture a frame yet: Jetson exposes `/dev/media0`, but no `/dev/video*` device and no `nvarguscamerasrc` GStreamer element were available.
+Current v0.4 reliability result: `40` concurrent-load requests at concurrency `4`, `40/40` expected routes matched, `0` backend errors, `0` timeouts.
+
+Current v0.5a camera/CV result:
+
+- camera: IMX219 on CAM1, configured as `Camera IMX219-C` on CSI Header 2
+- capture backend: `GStreamer Argus`
+- sample: [results/figures/camera_v05_sample.jpg](results/figures/camera_v05_sample.jpg)
+- local CV: MobileNet-SSD through OpenCV DNN, model files under `/home/rainbow/models/vision/mobilenet_ssd/`
+- local CV inference latency: about `76.6 ms`
+- vision smoke: [serving/results/raw/vision_router_smoke.csv](serving/results/raw/vision_router_smoke.csv)
+- route distribution: local `4`, remote `4`, reject `2`, expected routes `10/10`
+- remote VLM: mock placeholder, explicitly marked with `remote_is_mock=true`
+
+Vision design docs:
+
+- [serving/docs/vision_routing_design.md](serving/docs/vision_routing_design.md)
+- [serving/docs/project3_tensorrt_plan.md](serving/docs/project3_tensorrt_plan.md)

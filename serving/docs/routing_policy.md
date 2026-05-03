@@ -115,6 +115,43 @@ Telemetry-aware routing:
 - `privacy=local_only` under high temperature rejects, because the only safe backend is currently unsafe;
 - v0.4 exposes `/state` and `/state/reset` for simulation-based smoke tests. A real `tegrastats` sidecar remains future work.
 
+## v0.5a Vision Routing Rules
+
+The vision path is separate from the text router. It is implemented by `serving/app/camera.py`, `serving/app/local_cv.py`, `serving/app/vision_analyzer.py`, `serving/app/vision_policy.py`, `serving/app/vision_router.py`, and `serving/scripts/smoke_vision_router.py`.
+
+Vision request fields:
+
+- `task_type`: `detect`, `classify`, `vqa`, `scene_description`
+- `privacy`: `local_only`, `allow_remote`
+- `quality`: `low`, `medium`, `high`
+- `image_source`: `camera`, `file`
+- `latency_budget_ms`
+
+Local vision route:
+
+- `task_type=detect` or `classify`;
+- local CV backend is available;
+- `quality` is not `high`.
+
+Engineering reason: simple object detection/classification can be handled on Jetson without sending images off-device. v0.5a uses MobileNet-SSD through OpenCV DNN as a small, real local CV baseline.
+
+Remote vision route:
+
+- `privacy=allow_remote`;
+- `task_type=vqa` or `scene_description`;
+- or `quality=high`.
+
+Engineering reason: high-level visual explanation needs a VLM, which is outside the current Jetson local baseline. v0.5a marks this route as `remote_is_mock=true`; v0.5b can attach a real remote VLM after model selection.
+
+Vision reject route:
+
+- `privacy=local_only` and the task requires semantic visual reasoning;
+- unknown vision task type;
+- semantic task with an impossible latency budget;
+- required backend unavailable.
+
+Engineering reason: a private image should not be sent to a remote VLM just because the local detector cannot explain the whole scene. Rejecting is the safer and more honest behavior.
+
 ## Reject Rules
 
 A request should be rejected when:
@@ -157,5 +194,6 @@ The MVP can grow in stages:
 - add streaming support to `/v1/chat/completions`;
 - replace the SSH tunnel with a production network path or service discovery entry;
 - add per-task quality evaluation logs;
-- add camera/VLM routing later, with Gemma multimodal policy separated from text-only routing;
+- turn the v0.5a script-driven camera path into HTTP endpoints once the model and privacy boundaries are stable;
+- connect a real remote VLM in v0.5b after a separate model choice and memory/runtime check;
 - add concurrency tests and overload behavior once the single-request policy is stable.
