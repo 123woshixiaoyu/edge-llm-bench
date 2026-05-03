@@ -141,7 +141,7 @@ Remote vision route:
 - `task_type=vqa` or `scene_description`;
 - or `quality=high`.
 
-Engineering reason: high-level visual explanation needs a VLM, which is outside the current Jetson local baseline. v0.5a marks this route as `remote_is_mock=true`; v0.5b can attach a real remote VLM after model selection.
+Engineering reason: high-level visual explanation needs a VLM, which is outside the current Jetson local baseline. v0.5a marks this route as `remote_is_mock=true`; v0.5b attaches a real RTX/WSL VLM backend after model selection.
 
 Vision reject route:
 
@@ -151,6 +151,43 @@ Vision reject route:
 - required backend unavailable.
 
 Engineering reason: a private image should not be sent to a remote VLM just because the local detector cannot explain the whole scene. Rejecting is the safer and more honest behavior.
+
+## v0.5b Real VLM Routing Rules
+
+v0.5b keeps the same vision policy and changes the remote action from a placeholder to a real backend call:
+
+- local `detect` / `classify`: Jetson MobileNet-SSD through OpenCV DNN;
+- remote `vqa` / `scene_description`: RTX/WSL Gemma 4 E2B-it multimodal backend when privacy allows;
+- remote high-quality visual task: RTX/WSL VLM when privacy allows;
+- reject `privacy=local_only` semantic vision tasks: no remote image transfer.
+
+The selected remote backend is:
+
+```text
+gemma4_e2b_it_q4_mmproj
+```
+
+It is implemented as a small HTTP wrapper around `llama-mtmd-cli`, using the existing local model files:
+
+```text
+/mnt/d/AI/Models/gemma4/E2B-it/gemma-4-E2B-it-Q4_K_M.gguf
+/mnt/d/AI/Models/gemma4/E2B-it/mmproj-F16.gguf
+```
+
+Images are transmitted as base64 in the request body. The router must not send a Jetson filesystem path as the remote input because that path is not readable from WSL and would make the backend depend on shared storage.
+
+The current smoke run uses an SSH reverse tunnel:
+
+```text
+Jetson 127.0.0.1:18091 -> RTX/WSL 127.0.0.1:8091
+```
+
+Policy evidence in `serving/results/raw/vision_router_real_vlm_smoke.csv`:
+
+- `10/10` expected routes matched;
+- route distribution: local `4`, remote `4`, reject `2`;
+- all remote rows have `remote_is_mock=false`;
+- local-only semantic requests are rejected and are not sent to the RTX VLM.
 
 ## Reject Rules
 
@@ -195,5 +232,5 @@ The MVP can grow in stages:
 - replace the SSH tunnel with a production network path or service discovery entry;
 - add per-task quality evaluation logs;
 - turn the v0.5a script-driven camera path into HTTP endpoints once the model and privacy boundaries are stable;
-- connect a real remote VLM in v0.5b after a separate model choice and memory/runtime check;
+- improve the v0.5b remote VLM server by keeping the model resident instead of launching `llama-mtmd-cli` once per request;
 - add concurrency tests and overload behavior once the single-request policy is stable.

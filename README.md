@@ -262,4 +262,50 @@ The earlier `no_detection` result came from the content of the first sample fram
 Vision design docs:
 
 - [serving/docs/vision_routing_design.md](serving/docs/vision_routing_design.md)
+- [serving/docs/real_vlm_backend.md](serving/docs/real_vlm_backend.md)
 - [serving/docs/project3_tensorrt_plan.md](serving/docs/project3_tensorrt_plan.md)
+
+v0.5b replaces the remote VLM placeholder with a real RTX/WSL VLM backend while keeping the same camera-aware policy. Local detect/classify tasks still run on Jetson MobileNet-SSD; scene description, VQA, and high-quality visual tasks route to the RTX VLM when privacy allows; `privacy=local_only` semantic vision tasks are rejected instead of sending images off-device.
+
+The v0.5b model choice is the existing local Gemma 4 E2B-it multimodal GGUF pair:
+
+- text/model GGUF: `/mnt/d/AI/Models/gemma4/E2B-it/gemma-4-E2B-it-Q4_K_M.gguf`
+- projector GGUF: `/mnt/d/AI/Models/gemma4/E2B-it/mmproj-F16.gguf`
+- runtime: `llama.cpp/build/bin/llama-mtmd-cli`, wrapped by a small FastAPI server
+- no new VLM weights were downloaded
+
+Run the remote VLM server on the RTX/WSL side:
+
+```bash
+cd /mnt/d/AI/edge-llm-bench
+PORT=8091 .venv/bin/python serving/scripts/run_remote_vlm_server_5090.py
+```
+
+In the current WSL networking setup, the Jetson accesses that server through an SSH reverse tunnel:
+
+```text
+Jetson 127.0.0.1:18091 -> RTX/WSL 127.0.0.1:8091
+```
+
+Then run the real VLM smoke test on Jetson:
+
+```bash
+python3 serving/scripts/smoke_vision_router_real_vlm.py \
+  --remote-url http://127.0.0.1:18091 \
+  --out serving/results/raw/vision_router_real_vlm_smoke.csv \
+  --baseline-out serving/results/raw/local_cv_real_vlm_baseline.csv \
+  --sample-image results/figures/camera_v05_real_vlm_sample.jpg
+```
+
+Current v0.5b result:
+
+- smoke CSV: [serving/results/raw/vision_router_real_vlm_smoke.csv](serving/results/raw/vision_router_real_vlm_smoke.csv)
+- local CV baseline: [serving/results/raw/local_cv_real_vlm_baseline.csv](serving/results/raw/local_cv_real_vlm_baseline.csv)
+- sample frame: [results/figures/camera_v05_real_vlm_sample.jpg](results/figures/camera_v05_real_vlm_sample.jpg)
+- route distribution: local `4`, remote `4`, reject `2`
+- expected routes: `10/10`
+- all remote rows have `remote_is_mock=false`
+- remote model: `gemma4_e2b_it_q4_mmproj`
+- remote VLM latency range: about `19.2-20.0 s` per remote call
+
+Images are sent to the RTX backend as base64 in the HTTP request, not as local file paths, because Jetson paths are not readable from WSL.

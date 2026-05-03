@@ -6,6 +6,7 @@ import uuid
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
+from .backends.vlm import HttpVLMBackend
 from .camera import CameraFrame, capture_frame
 from .local_cv import LocalCVResult, run_mobilenet_ssd
 from .vision_analyzer import ImageSource, VisionPrivacy, VisionQuality, VisionTaskType, analyze_vision_task
@@ -21,6 +22,8 @@ class VisionRequest:
     latency_budget_ms: int = 3000
     request_id: str | None = None
     expected_route: str | None = None
+    prompt: str | None = None
+    max_tokens: int = 128
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -34,6 +37,8 @@ class VisionResult:
     capture: CameraFrame
     local_cv: LocalCVResult
     remote_latency_ms: float | None
+    remote_model: str | None
+    remote_response_text: str
     total_latency_ms: float
     match_expected: bool | None
     error: str = ""
@@ -46,6 +51,8 @@ class VisionResult:
             "capture": self.capture.to_dict(),
             "local_cv": self.local_cv.to_dict(),
             "remote_latency_ms": self.remote_latency_ms,
+            "remote_model": self.remote_model,
+            "remote_response_text": self.remote_response_text,
             "total_latency_ms": round(self.total_latency_ms, 2),
             "match_expected": self.match_expected,
             "error": self.error,
@@ -66,9 +73,19 @@ class VisionRouter:
         *,
         model_dir: Path | None = None,
         policy: VisionPolicyEngine | None = None,
+        remote_backend: HttpVLMBackend | None = None,
     ):
         self.model_dir = model_dir
         self.policy = policy or VisionPolicyEngine()
+        self.remote_backend = remote_backend
+
+    def default_remote_prompt(self, request: VisionRequest, local_cv: LocalCVResult) -> str:
+        labels = ", ".join(local_cv.detected_labels) if local_cv.detected_labels else "none"
+        if request.task_type == "vqa":
+            return f"What is visible in this image? Local CV detected: {labels}."
+        if request.task_type == "scene_description":
+            return f"Describe the scene in one or two sentences. Local CV detected: {labels}."
+        return f"Describe the image and mention any important objects. Local CV detected: {labels}."
 
     def route_existing_frame(
         self,
@@ -89,9 +106,29 @@ class VisionRouter:
             local_cv_available=local_cv_available,
         )
         remote_latency_ms = None
+        remote_model = None
+        remote_response_text = ""
         error = local_cv.error if decision.route == "local" and not local_cv.ok else ""
         if decision.route == "remote":
-            _, remote_latency_ms = mock_remote_vlm_result(request.task_type, local_cv.detected_labels)
+            if self.remote_backend is None:
+                remote_response_text, remote_latency_ms = mock_remote_vlm_result(
+                    request.task_type, local_cv.detected_labels
+                )
+            else:
+                prompt = request.prompt or self.default_remote_prompt(request, local_cv)
+                remote_result = self.remote_backend.complete_image(
+                    image_path=capture.image_path,
+                    prompt=prompt,
+                    max_tokens=request.max_tokens,
+                )
+                remote_latency_ms = remote_result.latency_ms
+                remote_model = remote_result.model
+                remote_response_text = remote_result.text
+                decision.remote_is_mock = False
+                if remote_result.model:
+                    decision.selected_model = remote_result.model
+                if not remote_result.ok:
+                    error = remote_result.error or "remote VLM backend error"
         match_expected = None
         if request.expected_route is not None:
             match_expected = decision.route == request.expected_route
@@ -106,6 +143,8 @@ class VisionRouter:
             capture=capture,
             local_cv=local_cv,
             remote_latency_ms=remote_latency_ms,
+            remote_model=remote_model,
+            remote_response_text=remote_response_text,
             total_latency_ms=total_latency_ms,
             match_expected=match_expected,
             error=error,

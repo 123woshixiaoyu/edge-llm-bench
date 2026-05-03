@@ -181,6 +181,46 @@ serving/results/raw/vision_router_smoke.csv
 
 Current smoke result: 10/10 expected routes matched, with local `4`, remote `4`, and reject `2`. The initial sample produced `no_detection` because of image content, not a pipeline failure. A follow-up positive detection sample from the real CSI camera detected `chair` with confidence `0.9734`; capture latency was about 1198.55 ms and local CV inference latency was about 77.96 ms.
 
+## v0.5b Real Remote VLM Backend
+
+v0.5b keeps the Jetson camera and local CV path from v0.5a, then connects semantic vision routes to a real RTX/WSL VLM backend. The remote route is no longer a placeholder for VQA, scene description, and high-quality visual requests when `privacy=allow_remote`.
+
+```mermaid
+flowchart TD
+    A["Jetson IMX219 CSI camera"] --> B["GStreamer Argus capture"]
+    B --> C["OpenCV DNN MobileNet-SSD"]
+    C --> D["Vision policy"]
+    D -->|detect / classify| E["Jetson local CV result"]
+    D -->|scene / VQA / high quality, privacy allows| F["RTX/WSL FastAPI VLM server"]
+    D -->|privacy local_only + semantic vision| G["Reject"]
+    F --> H["llama-mtmd-cli<br/>Gemma 4 E2B-it Q4 + mmproj-F16"]
+    E --> I["CSV decision log"]
+    H --> I
+    G --> I
+```
+
+The RTX backend wraps `llama.cpp/build/bin/llama-mtmd-cli` with `serving/app/remote_vlm_server.py`. It uses the existing Gemma 4 E2B-it multimodal GGUF assets:
+
+```text
+/mnt/d/AI/Models/gemma4/E2B-it/gemma-4-E2B-it-Q4_K_M.gguf
+/mnt/d/AI/Models/gemma4/E2B-it/mmproj-F16.gguf
+```
+
+No new VLM weights were downloaded for v0.5b. The Jetson sends images as base64 in the HTTP request because its local image paths are not visible to the RTX/WSL process. In the current network setup, the Jetson accesses the WSL server through:
+
+```text
+Jetson 127.0.0.1:18091 -> RTX/WSL 127.0.0.1:8091
+```
+
+Smoke verification writes:
+
+```text
+serving/results/raw/vision_router_real_vlm_smoke.csv
+serving/results/raw/local_cv_real_vlm_baseline.csv
+```
+
+The current run matched expected routes for `10/10` cases: local `4`, remote `4`, reject `2`. All remote rows are marked `remote_is_mock=false` and use `gemma4_e2b_it_q4_mmproj`. Remote latency is about `19.2-20.0 s` per request because the MVP wrapper launches the CLI per call; persistent serving optimization is intentionally left for later.
+
 ## Decision Logging
 
 Each request appends a JSON line to:
@@ -198,8 +238,9 @@ The log records timestamp, request id, task type, estimated tokens, quality, pri
 - The policy is intentionally simple and explainable.
 - No streaming responses yet.
 - No real concurrent queue or admission control.
-- No TensorRT, vLLM, real VLM, video stream, or multimodal API endpoint.
+- No TensorRT, vLLM, video stream, or multimodal HTTP endpoint on the Jetson gateway.
 - v0.5a camera routing is script-driven; an HTTP vision API is future work.
+- v0.5b real remote VLM is single-image and low-concurrency; it is a correctness loop, not an optimized VLM serving stack.
 - The load test evaluates policy agreement, not model quality.
 
 ## Run Locally

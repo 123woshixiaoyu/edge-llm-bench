@@ -1,0 +1,2 @@
+image_path,camera_backend,resolution,capture_latency_ms,local_cv_model,model_dir,detected_labels,detections,local_cv_latency_ms,local_cv_total_latency_ms,ok,error
+/home/rainbow/edge-llm-bench/results/figures/camera_v05_real_vlm_sample.jpg,GStreamer Argus,1280x720,1214.69,mobilenet_ssd_voc_opencv_dnn,/home/rainbow/models/vision/mobilenet_ssd,"[""chair"", ""diningtable""]","[{""label"": ""chair"", ""confidence"": 0.727, ""box"": [198, 75, 1124, 714]}, {""label"": ""diningtable"", ""confidence"": 0.3106, ""box"": [179, 113, 1182, 714]}]",79.29,241.99,True,
