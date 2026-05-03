@@ -44,52 +44,71 @@ def gst_element_available(name: str) -> bool:
     return proc.returncode == 0 and "No such element" not in proc.stdout
 
 
-def capture_with_gstreamer(device: Path | None, out_image: Path) -> tuple[bool, str, float | None]:
+def _argus_capture_command(out_image: Path) -> list[str]:
+    return [
+        "gst-launch-1.0",
+        "-q",
+        "nvarguscamerasrc",
+        "sensor-id=0",
+        "num-buffers=1",
+        "!",
+        "video/x-raw(memory:NVMM),width=1280,height=720,framerate=30/1",
+        "!",
+        "nvvidconv",
+        "!",
+        "video/x-raw,format=I420",
+        "!",
+        "jpegenc",
+        "!",
+        "filesink",
+        f"location={out_image}",
+    ]
+
+
+def _v4l2_capture_command(device: Path, out_image: Path) -> list[str]:
+    return [
+        "gst-launch-1.0",
+        "-q",
+        "v4l2src",
+        f"device={device}",
+        "num-buffers=1",
+        "!",
+        "videoconvert",
+        "!",
+        "jpegenc",
+        "!",
+        "filesink",
+        f"location={out_image}",
+    ]
+
+
+def capture_with_gstreamer(
+    device: Path | None, out_image: Path, prefer_argus: bool = False
+) -> tuple[bool, str, float | None, str]:
     if not command_exists("gst-launch-1.0"):
-        return False, "gst-launch-1.0 is not available", None
+        return False, "gst-launch-1.0 is not available", None, "GStreamer"
     out_image.parent.mkdir(parents=True, exist_ok=True)
-    if device is not None:
-        cmd = [
-            "gst-launch-1.0",
-            "-q",
-            "v4l2src",
-            f"device={device}",
-            "num-buffers=1",
-            "!",
-            "videoconvert",
-            "!",
-            "jpegenc",
-            "!",
-            "filesink",
-            f"location={out_image}",
-        ]
+    if prefer_argus and gst_element_available("nvarguscamerasrc"):
+        cmd = _argus_capture_command(out_image)
+        backend = "GStreamer Argus"
+    elif device is not None:
+        cmd = _v4l2_capture_command(device, out_image)
+        backend = "GStreamer V4L2"
     elif gst_element_available("nvarguscamerasrc"):
-        cmd = [
-            "gst-launch-1.0",
-            "-q",
-            "nvarguscamerasrc",
-            "num-buffers=1",
-            "!",
-            "video/x-raw(memory:NVMM),width=1280,height=720,framerate=30/1",
-            "!",
-            "nvvidconv",
-            "!",
-            "video/x-raw,format=I420",
-            "!",
-            "jpegenc",
-            "!",
-            "filesink",
-            f"location={out_image}",
-        ]
+        cmd = _argus_capture_command(out_image)
+        backend = "GStreamer Argus"
     else:
-        return False, "no V4L2 device and nvarguscamerasrc is not available", None
+        return False, "no V4L2 device and nvarguscamerasrc is not available", None, "GStreamer"
 
     start = time.perf_counter()
     proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, timeout=20)
     latency_ms = (time.perf_counter() - start) * 1000
     if proc.returncode != 0:
-        return False, proc.stdout.strip()[:500], latency_ms
-    return out_image.exists() and out_image.stat().st_size > 0, "", latency_ms
+        return False, proc.stdout.strip()[:500], latency_ms, backend
+    if out_image.exists() and out_image.stat().st_size > 0:
+        return True, "", latency_ms, backend
+    message = proc.stdout.strip()[:500] or "pipeline completed but produced no image"
+    return False, message, latency_ms, backend
 
 
 def main() -> int:
@@ -127,13 +146,16 @@ def main() -> int:
 
     devices = [Path(args.device)] if args.device else list_devices()
     if not devices and cv2 is None:
-        ok, error, latency_ms = capture_with_gstreamer(None, args.out_image)
+        ok, error, latency_ms, backend = capture_with_gstreamer(
+            None, args.out_image, prefer_argus=True
+        )
         result.update(
             {
                 "ok": ok,
-                "backend": "GStreamer",
+                "backend": backend,
                 "camera_type": "csi_or_platform" if result["media_devices"] else "unknown",
                 "capture_latency_ms": round(latency_ms, 2) if latency_ms is not None else None,
+                "resolution": "1280x720" if backend == "GStreamer Argus" else None,
                 "stable": ok,
                 "error": error or result["error"],
             }
@@ -155,13 +177,17 @@ def main() -> int:
         result["device_path"] = str(device)
         result["camera_type"] = classify_camera(device)
         if cv2 is None:
-            ok, error, latency_ms = capture_with_gstreamer(device, args.out_image)
+            prefer_argus = result["camera_type"] == "csi_or_platform"
+            ok, error, latency_ms, backend = capture_with_gstreamer(
+                device, args.out_image, prefer_argus=prefer_argus
+            )
             if ok:
                 result.update(
                     {
                         "ok": True,
-                        "backend": "GStreamer V4L2",
+                        "backend": backend,
                         "capture_latency_ms": round(latency_ms or 0.0, 2),
+                        "resolution": "1280x720" if backend == "GStreamer Argus" else None,
                         "stable": True,
                         "error": "",
                     }

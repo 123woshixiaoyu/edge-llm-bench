@@ -1,0 +1,22 @@
+{
+  "ok": true,
+  "device_path": "/dev/video0",
+  "camera_type": "csi_or_platform",
+  "backend": "GStreamer Argus",
+  "resolution": "1280x720",
+  "fps_estimate": null,
+  "capture_latency_ms": 1249.44,
+  "stable": true,
+  "permission_issue": false,
+  "image_path": "results/figures/camera_smoke_after_jetson_io.jpg",
+  "video_devices": [
+    "/dev/video0"
+  ],
+  "media_devices": [
+    "/dev/media0"
+  ],
+  "gstreamer_available": true,
+  "v4l2src_available": true,
+  "nvarguscamerasrc_available": true,
+  "error": ""
+}
