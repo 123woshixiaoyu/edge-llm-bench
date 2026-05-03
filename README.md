@@ -247,6 +247,18 @@ Current v0.5a camera/CV result:
 - route distribution: local `4`, remote `4`, reject `2`, expected routes `10/10`
 - remote VLM: mock placeholder, explicitly marked with `remote_is_mock=true`
 
+v0.5a+ positive detection evidence:
+
+- positive sample: [results/figures/camera_v05_positive_detection.jpg](results/figures/camera_v05_positive_detection.jpg)
+- local CV CSV: [serving/results/raw/local_cv_positive_detection.csv](serving/results/raw/local_cv_positive_detection.csv)
+- vision router CSV: [serving/results/raw/vision_router_positive_detection.csv](serving/results/raw/vision_router_positive_detection.csv)
+- detected label: `chair`, confidence `0.9734`, box `[65, 48, 1043, 706]`
+- capture latency: about `1198.55 ms`
+- local CV inference latency: about `77.96 ms`
+- route distribution remains local `4`, remote `4`, reject `2`, expected routes `10/10`
+
+The earlier `no_detection` result came from the content of the first sample frame, not a failed camera or local CV pipeline. The positive detection run uses a real CSI camera frame and confirms the real camera + real local CV detection path.
+
 Vision design docs:
 
 - [serving/docs/vision_routing_design.md](serving/docs/vision_routing_design.md)

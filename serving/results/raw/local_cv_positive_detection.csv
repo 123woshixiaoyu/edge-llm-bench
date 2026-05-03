@@ -1,0 +1,2 @@
+image_path,camera_backend,resolution,capture_latency_ms,local_cv_model,model_dir,detected_labels,detections,local_cv_latency_ms,local_cv_total_latency_ms,ok,error
+results/figures/camera_positive_attempt.jpg,GStreamer Argus,1280x720,1198.55,mobilenet_ssd_voc_opencv_dnn,/home/rainbow/models/vision/mobilenet_ssd,"[""chair""]","[{""label"": ""chair"", ""confidence"": 0.9734, ""box"": [65, 48, 1043, 706]}]",77.96,250.03,True,

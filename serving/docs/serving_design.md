@@ -179,7 +179,7 @@ serving/results/raw/local_cv_baseline.csv
 serving/results/raw/vision_router_smoke.csv
 ```
 
-Current smoke result: 10/10 expected routes matched, with local `4`, remote `4`, and reject `2`. The local CV inference latency was about 76.6 ms on the captured 1280x720 frame after resizing to the model input.
+Current smoke result: 10/10 expected routes matched, with local `4`, remote `4`, and reject `2`. The initial sample produced `no_detection` because of image content, not a pipeline failure. A follow-up positive detection sample from the real CSI camera detected `chair` with confidence `0.9734`; capture latency was about 1198.55 ms and local CV inference latency was about 77.96 ms.
 
 ## Decision Logging
 

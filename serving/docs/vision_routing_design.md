@@ -121,6 +121,22 @@ Current result:
 - detected labels: `no_detection`
 - remote VLM: mock placeholder, explicitly marked in CSV
 
+The `no_detection` label above was a sample-content issue, not a pipeline failure. The image did not contain a clear PASCAL VOC object for MobileNet-SSD to detect. A follow-up positive detection run used a real CSI camera frame with a clearer object and produced:
+
+- sample: `results/figures/camera_v05_positive_detection.jpg`
+- local CV CSV: `serving/results/raw/local_cv_positive_detection.csv`
+- vision router CSV: `serving/results/raw/vision_router_positive_detection.csv`
+- route matches: `10/10`
+- route distribution: local `4`, remote `4`, reject `2`
+- detected label: `chair`
+- confidence: `0.9734`
+- box: `[65, 48, 1043, 706]`
+- capture latency: about `1198.55 ms`
+- local CV inference latency: about `77.96 ms`
+- local CV total latency: about `250.03 ms`
+
+This positive run proves that the v0.5a path is not only capturing frames and executing a model, but also producing a real local object detection result from the Jetson CSI camera. Remote VLM routes are still placeholders and remain clearly marked as mock.
+
 ## v0.5a vs v0.5b
 
 v0.5a proves the edge sensing and routing shape:
