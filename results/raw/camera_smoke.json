@@ -1,0 +1,20 @@
+{
+  "ok": false,
+  "device_path": null,
+  "camera_type": "csi_or_platform",
+  "backend": "GStreamer",
+  "resolution": null,
+  "fps_estimate": null,
+  "capture_latency_ms": null,
+  "stable": false,
+  "permission_issue": false,
+  "image_path": "results/figures/camera_smoke.jpg",
+  "video_devices": [],
+  "media_devices": [
+    "/dev/media0"
+  ],
+  "gstreamer_available": true,
+  "v4l2src_available": true,
+  "nvarguscamerasrc_available": false,
+  "error": "no V4L2 device and nvarguscamerasrc is not available"
+}

@@ -9,7 +9,7 @@ from fastapi.responses import JSONResponse
 
 from .policy import load_router_config
 from .router import TaskRouterService
-from .schemas import ChatChoice, ChatCompletionResponse, ChatRequest, Message, RouteResponse
+from .schemas import ChatChoice, ChatCompletionResponse, ChatRequest, Message, RouteResponse, RouterStateUpdate
 
 
 SERVING_ROOT = Path(__file__).resolve().parents[1]
@@ -33,6 +33,7 @@ def health() -> dict:
         "local_backend_available": state.local_available,
         "remote_backend_available": state.remote_available,
         "local_queue_depth": state.local_queue_depth,
+        "remote_queue_depth": state.remote_queue_depth,
         "jetson_temp_c": state.jetson_temp_c,
     }
 
@@ -40,6 +41,18 @@ def health() -> dict:
 @app.get("/metrics")
 def metrics() -> dict:
     return router_service.metrics()
+
+
+@app.post("/state")
+def update_state(update: RouterStateUpdate) -> dict:
+    state = router_service.update_state(update)
+    return {"status": "ok", "state": state.model_dump()}
+
+
+@app.post("/state/reset")
+def reset_state() -> dict:
+    state = router_service.reset_state()
+    return {"status": "ok", "state": state.model_dump()}
 
 
 @app.post("/v1/route", response_model=RouteResponse)
@@ -93,7 +106,8 @@ def chat_completions(request: ChatRequest):
         )
 
     backend = router_service.backend_for(decision)
-    backend_result = backend.generate(request.messages, decision.selected_model or "unknown", request.max_tokens)
+    with router_service.backend_slot(decision.route):
+        backend_result = backend.generate(request.messages, decision.selected_model or "unknown", request.max_tokens)
     total_latency_ms = (time.perf_counter() - start) * 1000
 
     if not backend_result.ok:

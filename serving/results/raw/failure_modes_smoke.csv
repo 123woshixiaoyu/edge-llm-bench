@@ -1,0 +1,7 @@
+case_name,request_id,route,selected_model,expected_route,match_expected,http_status,backend_latency_ms,total_latency_ms,is_mock_response,reasons,error
+remote_unavailable_complex,failure-smoke-000,reject,,reject,true,400,,0.1,false,task_type=code benefits from stronger backend; remote backend unavailable; no explicit degrade-to-local policy,request rejected by routing policy
+local_unavailable_simple,failure-smoke-001,remote,qwen35_4b_q4,remote,true,200,610.66,610.86,false,local backend unavailable,
+local_queue_overloaded,failure-smoke-002,remote,qwen35_4b_q4,remote,true,200,568.56,568.79,false,local_queue_depth=2 >= local_queue_limit=2,
+high_temperature,failure-smoke-003,remote,qwen35_4b_q4,remote,true,200,582.75,583.03,false,jetson_temp_c=80.0 >= max_jetson_temp_c=75.0,
+privacy_local_only_local_unavailable,failure-smoke-004,reject,,reject,true,400,,0.09,false,privacy=local_only but local backend is unavailable,request rejected by routing policy
+privacy_local_only_queue_overloaded,failure-smoke-005,reject,,reject,true,400,,0.07,false,privacy=local_only prevents remote fallback; local_queue_depth=2 >= local_queue_limit=2,request rejected by routing policy

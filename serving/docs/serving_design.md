@@ -129,6 +129,27 @@ serving/results/raw/dual_real_backend_smoke.csv
 
 The v0.3 smoke run uses 11 requests: 4 local, 6 remote, and 1 reject. Both local and remote successful responses must be non-mock.
 
+## v0.4 Serving Reliability
+
+v0.4 keeps the v0.3 architecture and improves serving behavior under pressure:
+
+- local and remote backend calls now maintain real in-process inflight counters;
+- `/health` reports `local_queue_depth` and `remote_queue_depth`;
+- the policy routes away from Jetson when local queue depth or simulated temperature crosses configured limits;
+- privacy-preserving requests reject instead of falling back to remote when local execution is unsafe or unavailable;
+- remote-required tasks reject if the RTX backend is unavailable, unless a future explicit degrade policy is added;
+- `/state` and `/state/reset` provide test hooks for simulated backend availability, queue depth, and temperature.
+
+The router is still not production-grade: it does not yet have distributed queue coordination, persistent telemetry, admission control across multiple gateway processes, streaming cancellation, or service discovery. It now has the basic reliability shape needed for an edge serving prototype: observable load, deterministic fallback/reject behavior, and scripts that exercise concurrency and failure modes.
+
+Reliability outputs:
+
+```text
+serving/results/raw/dual_real_backend_load_test.csv
+serving/results/raw/dual_real_backend_load_test_summary.csv
+serving/results/raw/failure_modes_smoke.csv
+```
+
 ## Decision Logging
 
 Each request appends a JSON line to:

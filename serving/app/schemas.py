@@ -21,7 +21,16 @@ class RouterState(BaseModel):
     local_available: bool = True
     remote_available: bool = True
     local_queue_depth: int = 0
+    remote_queue_depth: int = 0
     jetson_temp_c: float | None = 55.0
+
+
+class RouterStateUpdate(BaseModel):
+    local_available: bool | None = None
+    remote_available: bool | None = None
+    local_queue_depth: int | None = None
+    remote_queue_depth: int | None = None
+    jetson_temp_c: float | None = None
 
 
 class ChatRequest(BaseModel):

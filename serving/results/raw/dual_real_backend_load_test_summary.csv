@@ -1,0 +1,2 @@
+total_requests,success_count,reject_count,backend_error_count,timeout_count,route_match_rate,local_count,remote_count,reject_route_count,local_p50_latency_ms,local_p95_latency_ms,local_p99_latency_ms,remote_p50_latency_ms,remote_p95_latency_ms,remote_p99_latency_ms,total_p50_latency_ms,total_p95_latency_ms,total_p99_latency_ms
+40,35,5,0,0,1.0,18,17,5,2613.36,2852.85,2853.24,705.55,1233.71,1497.67,1233.71,2793.71,2853.24

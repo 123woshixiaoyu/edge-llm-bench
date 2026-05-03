@@ -134,6 +134,26 @@ class PolicyEngine:
                     estimated_risk="high",
                     reasons=["privacy=local_only but local backend is unavailable"],
                 )
+            if state.local_queue_depth >= queue_limit:
+                return RouteDecision(
+                    route="reject",
+                    selected_model=None,
+                    estimated_risk="high",
+                    reasons=[
+                        "privacy=local_only prevents remote fallback",
+                        f"local_queue_depth={state.local_queue_depth} >= local_queue_limit={queue_limit}",
+                    ],
+                )
+            if state.jetson_temp_c is not None and state.jetson_temp_c >= max_temp:
+                return RouteDecision(
+                    route="reject",
+                    selected_model=None,
+                    estimated_risk="high",
+                    reasons=[
+                        "privacy=local_only prevents remote fallback",
+                        f"jetson_temp_c={state.jetson_temp_c} >= max_jetson_temp_c={max_temp}",
+                    ],
+                )
             risk = "high" if self.complex_task(analysis, request) else "low"
             reasons.append("privacy=local_only requires local execution")
             if self.complex_task(analysis, request):
@@ -173,18 +193,11 @@ class PolicyEngine:
                     estimated_risk="low" if request.quality == "high" else "medium",
                     reasons=remote_triggers,
                 )
-            if state.local_available and analysis.estimated_prompt_tokens <= max_local:
-                return RouteDecision(
-                    route="local",
-                    selected_model=self.local_model(request, analysis),
-                    estimated_risk="high",
-                    reasons=remote_triggers + ["remote backend unavailable; degraded to local"],
-                )
             return RouteDecision(
                 route="reject",
                 selected_model=None,
                 estimated_risk="high",
-                reasons=remote_triggers + ["remote backend unavailable and local fallback is not safe"],
+                reasons=remote_triggers + ["remote backend unavailable; no explicit degrade-to-local policy"],
             )
 
         if state.local_available:

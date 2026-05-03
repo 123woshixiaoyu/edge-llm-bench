@@ -93,6 +93,28 @@ In v0.3 the remote route can be backed by a real RTX 5090 `llama-server` running
 
 Engineering reason: Jetson should keep low-latency and privacy-sensitive work near the edge, while RTX absorbs tasks that benefit from the larger 4B model and higher compute budget.
 
+## v0.4 Reliability Rules
+
+Queue-aware routing:
+
+- local route increments `local_queue_depth` while the backend call is inflight and decrements it in `finally`;
+- remote route does the same for `remote_queue_depth`;
+- when `local_queue_depth >= local_queue_limit`, `allow_remote` requests are routed remote;
+- when `privacy=local_only` and local queue is overloaded, the request is rejected because remote fallback would violate privacy.
+
+Fallback behavior:
+
+- if local is unavailable and privacy allows remote, simple tasks can fall back to remote;
+- if local is unavailable and `privacy=local_only`, the request is rejected;
+- if remote is unavailable for code, reasoning, long-context, or `quality=high`, the request is rejected instead of being forced onto Jetson;
+- both-backends-unavailable is always rejected.
+
+Telemetry-aware routing:
+
+- `jetson_temp_c >= max_jetson_temp_c` pushes `allow_remote` tasks to RTX;
+- `privacy=local_only` under high temperature rejects, because the only safe backend is currently unsafe;
+- v0.4 exposes `/state` and `/state/reset` for simulation-based smoke tests. A real `tegrastats` sidecar remains future work.
+
 ## Reject Rules
 
 A request should be rejected when:

@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 import time
+import threading
 import uuid
 from pathlib import Path
+from contextlib import contextmanager
+from collections.abc import Iterator
 
 from .analyzer import analyze_request
 from .backends.base import Backend
@@ -10,7 +13,7 @@ from .backends.llamacpp import LlamaCppBackend
 from .backends.mock import MockBackend
 from .metrics import DecisionLogger
 from .policy import PolicyEngine, RouterConfig
-from .schemas import ChatRequest, RouteDecision, RouterState, TaskAnalysis
+from .schemas import ChatRequest, RouteDecision, RouterState, RouterStateUpdate, TaskAnalysis
 
 
 class TaskRouterService:
@@ -20,8 +23,11 @@ class TaskRouterService:
         self.serving_root = serving_root
         self.logger = DecisionLogger(serving_root / "results/raw/routing_decisions.jsonl")
         self.local_backend, self.remote_backend = self._build_backends()
-        self.local_queue_depth = 0
+        self._lock = threading.Lock()
+        self.local_inflight = 0
+        self.remote_inflight = 0
         self.jetson_temp_c: float | None = 55.0
+        self._state_override = RouterStateUpdate()
 
     def _build_backends(self) -> tuple[Backend, Backend]:
         if self.config.backend_mode == "hybrid":
@@ -39,12 +45,56 @@ class TaskRouterService:
     def current_state(self, override: RouterState | None = None) -> RouterState:
         if override is not None:
             return override
-        return RouterState(
+        with self._lock:
+            local_inflight = self.local_inflight
+            remote_inflight = self.remote_inflight
+            simulated = self._state_override
+            jetson_temp_c = self.jetson_temp_c
+        state = RouterState(
             local_available=self.local_backend.available(),
             remote_available=self.remote_backend.available(),
-            local_queue_depth=self.local_queue_depth,
-            jetson_temp_c=self.jetson_temp_c,
+            local_queue_depth=local_inflight,
+            remote_queue_depth=remote_inflight,
+            jetson_temp_c=jetson_temp_c,
         )
+        update = simulated.model_dump(exclude_none=True)
+        if "local_queue_depth" in update:
+            update["local_queue_depth"] = max(local_inflight, int(update["local_queue_depth"]))
+        if "remote_queue_depth" in update:
+            update["remote_queue_depth"] = max(remote_inflight, int(update["remote_queue_depth"]))
+        return state.model_copy(update=update)
+
+    def update_state(self, update: RouterStateUpdate) -> RouterState:
+        with self._lock:
+            self._state_override = update
+            if update.jetson_temp_c is not None:
+                self.jetson_temp_c = update.jetson_temp_c
+        return self.current_state()
+
+    def reset_state(self) -> RouterState:
+        with self._lock:
+            self._state_override = RouterStateUpdate()
+            self.jetson_temp_c = 55.0
+        return self.current_state()
+
+    @contextmanager
+    def backend_slot(self, route: str) -> Iterator[None]:
+        if route not in {"local", "remote"}:
+            yield
+            return
+        with self._lock:
+            if route == "local":
+                self.local_inflight += 1
+            else:
+                self.remote_inflight += 1
+        try:
+            yield
+        finally:
+            with self._lock:
+                if route == "local":
+                    self.local_inflight = max(0, self.local_inflight - 1)
+                else:
+                    self.remote_inflight = max(0, self.remote_inflight - 1)
 
     def route(self, request: ChatRequest) -> tuple[str, TaskAnalysis, RouteDecision, RouterState, float]:
         start = time.perf_counter()
@@ -64,6 +114,7 @@ class TaskRouterService:
         snapshot.update(
             {
                 "current_local_queue_depth": state.local_queue_depth,
+                "current_remote_queue_depth": state.remote_queue_depth,
                 "jetson_temp_c": state.jetson_temp_c,
                 "local_backend_available": state.local_available,
                 "remote_backend_available": state.remote_available,

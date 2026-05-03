@@ -204,3 +204,33 @@ python3 serving/scripts/smoke_dual_real_backends.py --url http://127.0.0.1:8000
 ```
 
 The v0.3 smoke test writes [serving/results/raw/dual_real_backend_smoke.csv](serving/results/raw/dual_real_backend_smoke.csv): 11/11 requests matched the expected route, 4/4 local requests returned non-mock Jetson model output, and 6/6 remote requests returned non-mock RTX model output.
+
+v0.4 focuses on serving reliability: real in-process queue depth, load-aware routing, explicit fallback/reject behavior, simulated telemetry hooks, concurrent load testing, and failure-mode smoke tests. It does not change the model lineup or introduce TensorRT/VLM.
+
+Run v0.4 reliability checks after starting the same dual real backends:
+
+```bash
+python3 serving/scripts/smoke_dual_real_backends.py \
+  --url http://127.0.0.1:8000
+
+python3 serving/scripts/load_test_dual_real_backends.py \
+  --url http://127.0.0.1:8000 \
+  --concurrency 4 \
+  --requests 40 \
+  --out serving/results/raw/dual_real_backend_load_test.csv
+
+python3 serving/scripts/summarize_serving_load_test.py \
+  serving/results/raw/dual_real_backend_load_test.csv \
+  --out serving/results/raw/dual_real_backend_load_test_summary.csv
+
+python3 serving/scripts/smoke_failure_modes.py \
+  --url http://127.0.0.1:8000
+```
+
+v0.5 prep is limited to camera smoke. It only checks whether Jetson can open a camera and capture one non-sensitive frame:
+
+```bash
+python3 scripts/camera_smoke.py
+```
+
+Current v0.4 reliability result: `40` concurrent-load requests at concurrency `4`, `40/40` expected routes matched, `0` backend errors, `0` timeouts. Current v0.5 prep camera smoke did not capture a frame yet: Jetson exposes `/dev/media0`, but no `/dev/video*` device and no `nvarguscamerasrc` GStreamer element were available.
