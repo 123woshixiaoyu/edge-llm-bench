@@ -21,6 +21,8 @@ Open the dashboard separately:
 streamlit run demo/app.py
 ```
 
+The Streamlit page is usually served at `http://127.0.0.1:8501`. Streamlit itself runs locally, but real backend mode should point to the Jetson Gateway.
+
 Or start it with the stack:
 
 ```bash
@@ -34,7 +36,11 @@ python3 demo/stop_interactive_stack.py
 python3 demo/check_interactive_stack.py
 ```
 
-In the browser, set **Router API base URL** to `http://192.168.1.102:8000` for real backend mode.
+In the browser, **Router API base URL** defaults to `http://192.168.1.102:8000` for real backend mode. If the Jetson IP changes, override it before starting Streamlit:
+
+```bash
+EDGE_GATEWAY_URL=http://custom-host:8000 streamlit run demo/app.py
+```
 
 The old manual multi-terminal flow still works as a fallback: start the RTX remote llama-server, RTX VLM server, SSH reverse tunnels, Jetson local llama-server, Jetson Gateway, and Streamlit UI separately.
 

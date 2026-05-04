@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import base64
+import os
 from io import BytesIO
 
 import streamlit as st
@@ -24,6 +25,13 @@ st.set_page_config(
 )
 
 
+DEFAULT_GATEWAY_URL = "http://192.168.1.102:8000"
+
+
+def default_gateway_url() -> str:
+    return os.environ.get("EDGE_GATEWAY_URL", DEFAULT_GATEWAY_URL)
+
+
 def mode_label(use_sample_mode: bool) -> str:
     return "sample mode" if use_sample_mode else "real backend mode with sample fallback"
 
@@ -39,7 +47,8 @@ def render_header() -> tuple[bool, str]:
     with left:
         use_sample_mode = st.toggle("Use sample results", value=True)
     with right:
-        api_base_url = st.text_input("Router API base URL", value="http://127.0.0.1:8000")
+        api_base_url = st.text_input("Router API base URL", value=default_gateway_url())
+        st.caption("Streamlit itself runs locally, but real backend mode should point to the Jetson Gateway.")
     st.info(f"Current mode: {mode_label(use_sample_mode)}")
     return use_sample_mode, api_base_url
 

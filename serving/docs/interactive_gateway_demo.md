@@ -75,6 +75,8 @@ Use `--with-ui` to start Streamlit as part of the stack, or run it separately:
 streamlit run demo/app.py
 ```
 
+The Streamlit page is usually `http://127.0.0.1:8501`. Streamlit itself runs locally, but real backend mode should point to the Jetson Gateway. The dashboard defaults the Router API base URL to `http://192.168.1.102:8000`; override it with `EDGE_GATEWAY_URL=http://custom-host:8000 streamlit run demo/app.py` if the Jetson IP changes.
+
 Stop only the processes launched by the orchestrator:
 
 ```bash
@@ -104,6 +106,8 @@ Start the dashboard from the repo root:
 ```bash
 streamlit run demo/app.py
 ```
+
+The Router API base URL field defaults to the Jetson Gateway at `http://192.168.1.102:8000`, while the Streamlit UI itself typically opens at `http://127.0.0.1:8501`. Set `EDGE_GATEWAY_URL` before launch to use a different Jetson address.
 
 Modes:
 
