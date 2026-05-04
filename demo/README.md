@@ -21,6 +21,8 @@ streamlit run demo/app.py
 
 Real text requests ask llama.cpp to disable template-level thinking when supported. Real remote VLM requests use a final-answer marker so the demo can show the final semantic answer instead of the model's intermediate reasoning text.
 
+`Request timeout seconds` is the UI client's wait limit for text responses. It is separate from `latency_budget_ms`: if the timeout is too small, the UI may show a committed sample fallback even though the model/backend is still working. For remote text routes, check the Jetson Gateway, RTX llama-server, and SSH tunnel before treating a timeout as a model failure.
+
 ## What It Shows
 
 - Text task routing across Jetson local LLM, RTX remote LLM, and reject paths.

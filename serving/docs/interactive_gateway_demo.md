@@ -38,6 +38,8 @@ Request fields:
 
 For text llama.cpp backends, the gateway sends `chat_template_kwargs={"enable_thinking": false}` so the demo output budget is spent on the user-visible answer instead of template-level thinking text.
 
+The dashboard also exposes a text `Request timeout seconds` control. This is the UI client's network wait limit, not a routing policy. If it is too small, the UI can fall back to committed sample evidence while the real backend would have completed with more time. For remote text routes, verify the Jetson Gateway, RTX llama-server, and SSH tunnel before classifying a timeout as a model failure.
+
 Response fields include:
 
 - route decision and reasons

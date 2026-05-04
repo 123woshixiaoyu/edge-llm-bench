@@ -140,6 +140,7 @@ def call_text_backend(
     quality: str,
     latency_budget_ms: int,
     max_tokens: int,
+    timeout_s: float = 60.0,
 ) -> dict[str, Any]:
     payload = {
         "messages": [{"role": "user", "content": prompt}],
@@ -158,7 +159,7 @@ def call_text_backend(
             headers={"Content-Type": "application/json"},
             method="POST",
         )
-        with urllib.request.urlopen(request, timeout=5) as response:
+        with urllib.request.urlopen(request, timeout=timeout_s) as response:
             raw = response.read().decode("utf-8")
         elapsed_ms = round((time.perf_counter() - start) * 1000, 2)
         data = json.loads(raw)
@@ -177,6 +178,7 @@ def call_text_backend(
             "sample_truncated": False,
             "max_tokens_used": max_tokens,
             "output_chars": len(message or raw),
+            "request_timeout_s": timeout_s,
             "reasons": decision.get("reasons", ["real backend response did not include route reasons"]),
             "input_preview": prompt[:120],
         }
@@ -195,18 +197,34 @@ def call_text_backend(
                 "sample_truncated": False,
                 "max_tokens_used": max_tokens,
                 "output_chars": len(data.get("error", str(exc))),
+                "request_timeout_s": timeout_s,
                 "reasons": decision.get("reasons", [data.get("error", str(exc))]),
                 "input_preview": prompt[:120],
             }
         except Exception:
             sample = select_text_sample(prompt, task_type, privacy, quality, latency_budget_ms)
             sample["mode"] = "sample fallback"
+            sample["request_timeout_s"] = timeout_s
             sample["reasons"] = [f"real backend returned HTTP {exc.code}", *sample["reasons"]]
             return sample
     except (urllib.error.URLError, TimeoutError, json.JSONDecodeError) as exc:
         sample = select_text_sample(prompt, task_type, privacy, quality, latency_budget_ms)
         sample["mode"] = "sample fallback"
-        sample["reasons"] = [f"real backend unavailable: {exc}", *sample["reasons"]]
+        sample["request_timeout_s"] = timeout_s
+        detail = str(exc)
+        if "timed out" in detail.lower() or isinstance(exc, TimeoutError):
+            reason = (
+                f"UI request timed out after {timeout_s:g}s; "
+                "check gateway, remote llama-server, and SSH tunnel."
+            )
+            sample["fallback_kind"] = "ui_client_timeout"
+        else:
+            reason = (
+                f"real backend unavailable within {timeout_s:g}s: {exc}; "
+                "check gateway, remote llama-server, and SSH tunnel."
+            )
+            sample["fallback_kind"] = "backend_unavailable"
+        sample["reasons"] = [reason, *sample["reasons"]]
         return sample
 
 

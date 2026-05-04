@@ -59,6 +59,9 @@ def render_text_panel(use_sample_mode: bool, api_base_url: str) -> None:
         quality = st.selectbox("Quality", ["low", "medium", "high"], index=1)
         latency_budget_ms = st.number_input("Latency budget ms", min_value=100, max_value=20000, value=3000, step=100)
         max_tokens = st.number_input("Max output tokens", min_value=32, max_value=2048, value=512, step=32)
+        request_timeout_s = st.number_input("Request timeout seconds", min_value=5, max_value=180, value=60, step=5)
+        if task_type in {"code", "reasoning"} or quality == "high":
+            st.caption("Remote/high-quality text routes may need 120 seconds if the RTX backend is busy.")
 
     if st.button("Route Text Task", type="primary"):
         if use_sample_mode:
@@ -72,7 +75,11 @@ def render_text_panel(use_sample_mode: bool, api_base_url: str) -> None:
                 quality,
                 int(latency_budget_ms),
                 int(max_tokens),
+                float(request_timeout_s),
             )
+
+        if result.get("mode") == "sample fallback":
+            st.warning("Real backend timed out/unavailable; showing committed sample fallback.")
 
         route_col, backend_col, latency_col = st.columns(3)
         route_col.metric("Route", result.get("route", "unknown"))
@@ -86,6 +93,7 @@ def render_text_panel(use_sample_mode: bool, api_base_url: str) -> None:
                 "sample_source": result.get("sample_source"),
                 "max_tokens_used": result.get("max_tokens_used"),
                 "output_chars": result.get("output_chars"),
+                "request_timeout_s": result.get("request_timeout_s"),
                 "reasons": result.get("reasons", []),
             }
         )
@@ -239,6 +247,10 @@ def render_vision_panel(use_sample_mode: bool, api_base_url: str) -> None:
 
 def render_backend_panel(use_sample_mode: bool, api_base_url: str) -> None:
     st.subheader("Backend Status")
+    st.caption(
+        "For real text remote routes, verify the Jetson Gateway, RTX remote llama-server, "
+        "and SSH tunnel are running before treating a fallback as a model failure."
+    )
     if use_sample_mode:
         st.json(backend_status())
     else:
