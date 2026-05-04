@@ -3,16 +3,18 @@ from __future__ import annotations
 import base64
 import os
 from io import BytesIO
+from pathlib import Path
+from typing import Any
 
 import streamlit as st
 
+from event_store import append_event, load_recent_events, summarize_recent_events
 from sample_results import (
     SAMPLE_IMAGE,
     backend_status,
     call_text_backend,
     call_vision_backend,
     draw_detections,
-    key_result_tables,
     real_backend_health,
     select_text_sample,
     select_vision_sample,
@@ -20,7 +22,7 @@ from sample_results import (
 
 
 st.set_page_config(
-    page_title="Jetson-First Edge AI Inference Gateway",
+    page_title="Jetson Local-First Monitoring Gateway",
     layout="wide",
 )
 
@@ -36,13 +38,181 @@ def mode_label(use_sample_mode: bool) -> str:
     return "sample mode" if use_sample_mode else "real backend mode with sample fallback"
 
 
-def render_header() -> tuple[bool, str]:
-    st.title("Jetson-First Edge AI Inference Gateway")
-    st.caption("Constraint-aware routing across local LLM/CV and remote LLM/VLM backends.")
-    st.write(
-        "This dashboard is a lightweight review surface for the edge gateway. "
-        "Sample mode reads committed CSV/image evidence. Real mode is optional and falls back cleanly when services are not running."
+def _as_float(value: Any) -> float | None:
+    if value in (None, "", "n/a"):
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _image_for_result(result: dict[str, Any], fallback: Any) -> Any:
+    if result.get("image_base64"):
+        try:
+            return BytesIO(base64.b64decode(result["image_base64"]))
+        except Exception:
+            return fallback
+    return fallback
+
+
+def _image_source_for_event(result: dict[str, Any], fallback: Any) -> Any:
+    return result.get("image_base64") or fallback
+
+
+def _labels(result: dict[str, Any]) -> list[Any]:
+    return result.get("local_cv_precheck_labels") or result.get("detected_labels") or []
+
+
+def _detections(result: dict[str, Any]) -> list[dict[str, Any]]:
+    return result.get("local_cv_precheck_detections") or result.get("detections") or []
+
+
+def _event_from_result(
+    *,
+    source: str,
+    result: dict[str, Any],
+    task_type: str,
+    privacy: str,
+    prompt: str = "",
+) -> dict[str, Any]:
+    return {
+        "source": source,
+        "prompt": prompt,
+        "task_type": task_type,
+        "privacy": privacy,
+        "route": result.get("route"),
+        "selected_backend": result.get("selected_backend") or result.get("local_cv_backend"),
+        "local_cv_labels": _labels(result),
+        "local_cv_latency_ms": _as_float(result.get("local_cv_inference_latency_ms")),
+        "remote_latency_ms": _as_float(result.get("remote_latency_ms")),
+        "total_latency_ms": _as_float(result.get("total_latency_ms")),
+        "final_answer_text": result.get("final_answer_text")
+        or result.get("full_response")
+        or result.get("response_preview")
+        or "",
+        "reasons": result.get("reasons") or [],
+        "error": result.get("error") or "",
+        "mode": result.get("mode"),
+    }
+
+
+def _record_event(
+    *,
+    source: str,
+    result: dict[str, Any],
+    task_type: str,
+    privacy: str,
+    prompt: str = "",
+    image_source: Any = None,
+) -> dict[str, Any]:
+    event = append_event(
+        _event_from_result(
+            source=source,
+            result=result,
+            task_type=task_type,
+            privacy=privacy,
+            prompt=prompt,
+        ),
+        image_source=image_source,
     )
+    st.session_state["latest_event"] = event
+    if event.get("image_path"):
+        st.session_state["latest_image_path"] = event["image_path"]
+    return event
+
+
+def _select_image_source(label: str, *, default_camera: bool, key_prefix: str) -> tuple[str, Any]:
+    options = ["sample image", "upload image", "Jetson camera"]
+    index = 2 if default_camera else 0
+    image_source = st.selectbox(label, options, index=index, key=f"{key_prefix}_image_source")
+    image_file = None
+    if image_source == "upload image":
+        image_file = st.file_uploader("Upload a snapshot", type=["jpg", "jpeg", "png"], key=f"{key_prefix}_upload")
+    if image_source == "Jetson camera":
+        return image_source, None
+    return image_source, image_file if image_file is not None else str(SAMPLE_IMAGE)
+
+
+def _display_local_precheck(result: dict[str, Any], image_payload: Any, caption: str) -> None:
+    detections = _detections(result)
+    labels = _labels(result)
+    annotated = draw_detections(image_payload, detections)
+
+    st.markdown("#### Local CV Precheck (Jetson)")
+    st.caption(
+        "The local YOLO TensorRT detector is the fast monitoring path. "
+        "When the final route is remote, these boxes remain edge-side pre-analysis."
+    )
+    left, right = st.columns([1, 1])
+    with left:
+        if annotated is not None:
+            st.image(annotated, caption=caption, use_container_width=True)
+        else:
+            st.warning("No snapshot image is available for display.")
+    with right:
+        st.metric("Local CV inference ms", result.get("local_cv_inference_latency_ms") or "n/a")
+        st.write(f"Detected labels: {', '.join(str(label) for label in labels) if labels else 'none'}")
+        st.json(
+            {
+                "local_cv_backend": result.get("local_cv_backend"),
+                "local_cv_model": result.get("local_cv_model"),
+                "detections": detections,
+                "capture_latency_ms": result.get("capture_latency_ms"),
+                "local_cv_total_latency_ms": result.get("local_cv_total_latency_ms"),
+            }
+        )
+
+
+def _display_routing_decision(result: dict[str, Any]) -> None:
+    st.markdown("#### Routing Decision")
+    route_col, backend_col, latency_col = st.columns(3)
+    route_col.metric("Route", result.get("route", "unknown"))
+    backend_col.metric("Selected backend", result.get("selected_backend") or result.get("local_cv_backend") or "none")
+    latency_col.metric("Total latency ms", result.get("total_latency_ms") or "n/a")
+    st.json(
+        {
+            "mode": result.get("mode"),
+            "remote_is_mock": result.get("remote_is_mock"),
+            "remote_latency_ms": result.get("remote_latency_ms"),
+            "status": result.get("status"),
+            "error": result.get("error"),
+            "reasons": result.get("reasons"),
+        }
+    )
+
+
+def _display_final_answer(result: dict[str, Any]) -> None:
+    route = result.get("route")
+    st.markdown("#### Final Routed Answer")
+    if route == "local":
+        st.success("Final answer source: Jetson local CV")
+        st.write("Detection/classification was completed locally on Jetson.")
+        st.json({"detected_labels": _labels(result), "detections": _detections(result)})
+    elif route == "remote":
+        st.info("Final answer source: RTX remote VLM")
+        st.write("The semantic answer below comes from the remote VLM. YOLO boxes above are local precheck evidence.")
+        text = result.get("full_response") or result.get("final_answer_text") or result.get("remote_response_text", "")
+        st.text_area("Remote semantic answer", value=text, height=220)
+    elif route == "reject":
+        st.warning("Final answer source: policy reject")
+        st.write("No model answer was produced.")
+        st.json({"reject_reasons": result.get("reasons", [])})
+    else:
+        st.write(result.get("final_answer_text") or result.get("response_preview") or "")
+
+
+def render_header() -> tuple[bool, str]:
+    st.title("Jetson Local-First Monitoring Gateway")
+    st.caption(
+        "A local-first edge monitoring workbench that uses Jetson for low-latency local detection "
+        "and routes event review / summaries to RTX backends only when privacy and system constraints allow."
+    )
+    st.write(
+        "Live monitoring stays on the Jetson fast path by default. "
+        "Remote LLM/VLM backends are used for event review, summaries, and policy explanations when allowed."
+    )
+
     left, right = st.columns([1, 2])
     with left:
         use_sample_mode = st.toggle("Use sample results", value=True)
@@ -53,26 +223,204 @@ def render_header() -> tuple[bool, str]:
     return use_sample_mode, api_base_url
 
 
-def render_text_panel(use_sample_mode: bool, api_base_url: str) -> None:
-    st.subheader("Text Task Router")
+def render_live_monitor(use_sample_mode: bool, api_base_url: str) -> None:
+    st.subheader("Live Monitor")
+    st.write("Capture a single snapshot and run the local Jetson YOLO TensorRT monitoring fast path.")
+
     left, right = st.columns([2, 1])
     with left:
-        prompt = st.text_area(
-            "Prompt",
-            value="Explain why Q4 quantization is useful for a Jetson edge deployment.",
-            height=140,
+        image_source, image_payload = _select_image_source(
+            "Snapshot source",
+            default_camera=not use_sample_mode,
+            key_prefix="live",
         )
     with right:
-        task_type = st.selectbox("Task type", ["qa", "summary", "code", "reasoning"], index=0)
-        privacy = st.selectbox("Privacy", ["allow_remote", "local_only"], index=0)
-        quality = st.selectbox("Quality", ["low", "medium", "high"], index=1)
-        latency_budget_ms = st.number_input("Latency budget ms", min_value=100, max_value=20000, value=3000, step=100)
-        max_tokens = st.number_input("Max output tokens", min_value=32, max_value=2048, value=512, step=32)
-        request_timeout_s = st.number_input("Request timeout seconds", min_value=5, max_value=180, value=60, step=5)
-        if task_type in {"code", "reasoning"} or quality == "high":
-            st.caption("Remote/high-quality text routes may need 120 seconds if the RTX backend is busy.")
+        with st.expander("Advanced routing settings"):
+            task_type = st.selectbox("Task", ["detect", "classify"], index=0, key="live_task")
+            privacy = st.selectbox("Privacy", ["allow_remote", "local_only"], index=0, key="live_privacy")
+            quality = st.selectbox("Quality", ["low", "medium", "high"], index=0, key="live_quality")
+            latency_budget_ms = st.number_input(
+                "Latency budget ms",
+                min_value=100,
+                max_value=60000,
+                value=3000,
+                step=100,
+                key="live_latency",
+            )
+            max_tokens = st.number_input(
+                "Max output tokens",
+                min_value=32,
+                max_value=1024,
+                value=128,
+                step=32,
+                key="live_tokens",
+            )
 
-    if st.button("Route Text Task", type="primary"):
+    if st.button("Run Local Detection", type="primary"):
+        if use_sample_mode:
+            result = select_vision_sample(task_type, privacy, quality)
+            image_for_display = str(SAMPLE_IMAGE)
+        else:
+            backend_source = "camera" if image_source == "Jetson camera" else "upload"
+            with st.spinner("Calling Jetson Gateway for local monitoring detection."):
+                result = call_vision_backend(
+                    api_base_url,
+                    image_source=backend_source,
+                    image_path=image_payload or str(SAMPLE_IMAGE),
+                    task_type=task_type,
+                    privacy=privacy,
+                    quality=quality,
+                    latency_budget_ms=int(latency_budget_ms),
+                    prompt="",
+                    max_tokens=int(max_tokens),
+                )
+            image_for_display = _image_for_result(result, image_payload or str(SAMPLE_IMAGE))
+
+        if result.get("mode") == "sample fallback":
+            st.warning("Real backend unavailable; showing committed sample fallback.")
+
+        _display_local_precheck(result, image_for_display, "Current snapshot with local YOLO monitoring boxes")
+        _display_routing_decision(result)
+        st.success("Route/location: Processed on Jetson" if result.get("route") == "local" else "Route/location recorded by policy")
+        event = _record_event(
+            source="live_monitor",
+            result=result,
+            task_type=task_type,
+            privacy=privacy,
+            image_source=_image_source_for_event(result, image_payload or str(SAMPLE_IMAGE)),
+        )
+        st.caption(f"Recorded event {event['event_id']} in Event History.")
+
+
+def render_event_review(use_sample_mode: bool, api_base_url: str) -> None:
+    st.subheader("Event Review")
+    st.write("Use RTX semantic vision only for event review when privacy allows it. This is not the real-time monitor.")
+
+    latest_image = st.session_state.get("latest_image_path")
+    source_options = ["recent snapshot", "sample image", "upload image", "Jetson camera"] if latest_image else [
+        "sample image",
+        "upload image",
+        "Jetson camera",
+    ]
+
+    left, right = st.columns([2, 1])
+    with left:
+        image_choice = st.selectbox("Review image", source_options, index=0, key="review_image_source")
+        upload = None
+        if image_choice == "upload image":
+            upload = st.file_uploader("Upload event image", type=["jpg", "jpeg", "png"], key="review_upload")
+        image_payload: Any
+        if image_choice == "recent snapshot" and latest_image:
+            image_payload = latest_image
+        elif image_choice == "upload image":
+            image_payload = upload or str(SAMPLE_IMAGE)
+        elif image_choice == "Jetson camera":
+            image_payload = None
+        else:
+            image_payload = str(SAMPLE_IMAGE)
+        prompt = st.text_area(
+            "Ask about this event",
+            value="Describe this monitoring event in one concise sentence.",
+            height=100,
+        )
+    with right:
+        task_type = st.selectbox("Review task", ["scene_description", "vqa"], index=0)
+        privacy = st.radio("Privacy mode", ["allow_remote", "local_only"], index=0, horizontal=True)
+        quality = st.selectbox("Review quality", ["medium", "high", "low"], index=0)
+        max_tokens = st.number_input("Vision max output tokens", min_value=32, max_value=1024, value=384, step=32)
+        latency_budget_ms = st.number_input(
+            "Latency budget ms",
+            min_value=100,
+            max_value=60000,
+            value=15000,
+            step=500,
+            key="review_latency",
+        )
+        if privacy == "allow_remote":
+            st.caption("Send to RTX workstation when semantic review is required.")
+        else:
+            st.caption("Privacy-safe mode blocks semantic vision offload.")
+
+    if st.button("Ask about this event", type="primary"):
+        if use_sample_mode:
+            result = select_vision_sample(task_type, privacy, quality)
+            image_for_display = str(SAMPLE_IMAGE)
+        else:
+            backend_source = "camera" if image_choice == "Jetson camera" else "upload"
+            with st.spinner("Reviewing event. Remote VLM routes can take 15-20 seconds."):
+                result = call_vision_backend(
+                    api_base_url,
+                    image_source=backend_source,
+                    image_path=image_payload or str(SAMPLE_IMAGE),
+                    task_type=task_type,
+                    privacy=privacy,
+                    quality=quality,
+                    latency_budget_ms=int(latency_budget_ms),
+                    prompt=prompt,
+                    max_tokens=int(max_tokens),
+                )
+            image_for_display = _image_for_result(result, image_payload or str(SAMPLE_IMAGE))
+
+        if privacy == "local_only" and result.get("route") == "reject":
+            st.warning(
+                "Blocked by privacy policy: semantic vision would require sending the image "
+                "to the remote workstation."
+            )
+        elif result.get("mode") == "sample fallback":
+            st.warning("Real backend unavailable; showing committed sample fallback.")
+
+        _display_local_precheck(result, image_for_display, "Event snapshot with local YOLO precheck boxes")
+        _display_routing_decision(result)
+        _display_final_answer(result)
+        event = _record_event(
+            source="event_review",
+            result=result,
+            task_type=task_type,
+            privacy=privacy,
+            prompt=prompt,
+            image_source=_image_source_for_event(result, image_payload or str(SAMPLE_IMAGE)),
+        )
+        st.caption(f"Recorded event {event['event_id']} in Event History.")
+
+
+def render_monitoring_assistant(use_sample_mode: bool, api_base_url: str) -> None:
+    st.subheader("Monitoring Assistant")
+    st.write(
+        "Monitoring Assistant is for event summaries, policy explanations, and backend status questions. "
+        "It is not positioned as a generic chatbot."
+    )
+    recent_context = summarize_recent_events(limit=8)
+    left, right = st.columns([2, 1])
+    with left:
+        user_prompt = st.text_area(
+            "Assistant request",
+            value="Summarize recent monitoring events and explain any routing decisions.",
+            height=140,
+        )
+        with st.expander("Recent event context sent to the assistant"):
+            st.text(recent_context)
+    with right:
+        task_type = st.selectbox("Assistant task", ["summary", "qa", "reasoning"], index=0)
+        privacy = st.selectbox("Assistant privacy", ["allow_remote", "local_only"], index=0)
+        quality = st.selectbox("Assistant quality", ["medium", "high", "low"], index=0)
+        latency_budget_ms = st.number_input(
+            "Latency budget ms",
+            min_value=100,
+            max_value=60000,
+            value=5000,
+            step=500,
+            key="assistant_latency",
+        )
+        max_tokens = st.number_input("Max output tokens", min_value=32, max_value=2048, value=512, step=32)
+        timeout_s = st.number_input("Request timeout seconds", min_value=5, max_value=180, value=60, step=5)
+
+    if st.button("Ask Monitoring Assistant", type="primary"):
+        prompt = (
+            "You are the Monitoring Assistant for a Jetson local-first edge monitoring gateway. "
+            "Use the recent event context when relevant.\n\n"
+            f"Recent events:\n{recent_context}\n\n"
+            f"User request:\n{user_prompt}"
+        )
         if use_sample_mode:
             result = select_text_sample(prompt, task_type, privacy, quality, int(latency_budget_ms))
         else:
@@ -84,222 +432,150 @@ def render_text_panel(use_sample_mode: bool, api_base_url: str) -> None:
                 quality,
                 int(latency_budget_ms),
                 int(max_tokens),
-                float(request_timeout_s),
+                float(timeout_s),
             )
-
         if result.get("mode") == "sample fallback":
             st.warning("Real backend timed out/unavailable; showing committed sample fallback.")
-
-        route_col, backend_col, latency_col = st.columns(3)
-        route_col.metric("Route", result.get("route", "unknown"))
-        backend_col.metric("Selected backend", result.get("selected_backend") or "none")
-        latency_col.metric("Total latency ms", result.get("total_latency_ms") or "n/a")
-        st.json(
-            {
-                "mode": result.get("mode"),
-                "backend_latency_ms": result.get("backend_latency_ms"),
-                "sample_request_id": result.get("sample_request_id"),
-                "sample_source": result.get("sample_source"),
-                "max_tokens_used": result.get("max_tokens_used"),
-                "output_chars": result.get("output_chars"),
-                "request_timeout_s": result.get("request_timeout_s"),
-                "reasons": result.get("reasons", []),
-            }
+        _display_routing_decision(result)
+        st.text_area("Assistant answer", value=result.get("full_response") or result.get("response_preview", ""), height=260)
+        event = _record_event(
+            source="monitoring_assistant",
+            result=result,
+            task_type=task_type,
+            privacy=privacy,
+            prompt=user_prompt,
         )
-        st.text_area("Response preview", value=result.get("response_preview", ""), height=160)
-        if result.get("sample_truncated"):
-            st.warning(result.get("sample_truncation_note") or "Sample mode only stores a preview.")
-        with st.expander("Full response", expanded=not result.get("sample_truncated")):
-            st.text_area(
-                "Full model response",
-                value=result.get("full_response") or result.get("response_preview", ""),
-                height=260,
-                label_visibility="collapsed",
-            )
+        st.caption(f"Recorded event {event['event_id']} in Event History.")
 
 
-def render_vision_panel(use_sample_mode: bool, api_base_url: str) -> None:
-    st.subheader("Vision Task Router")
-    left, right = st.columns([2, 1])
-    with left:
-        image_source = st.selectbox(
-            "Image source",
-            ["sample image", "upload image", "Jetson camera"],
-            index=0 if use_sample_mode else 2,
-        )
-        image_file = None
-        if image_source == "upload image":
-            image_file = st.file_uploader("Upload image", type=["jpg", "jpeg", "png"])
-        image_path = image_file if image_file is not None else str(SAMPLE_IMAGE)
-    with right:
-        task_type = st.selectbox("Vision task type", ["detect", "classify", "scene_description", "vqa"], index=0)
-        privacy = st.selectbox("Vision privacy", ["allow_remote", "local_only"], index=0)
-        quality = st.selectbox("Vision quality", ["low", "medium", "high"], index=0)
-        latency_budget_ms = st.number_input("Vision latency budget ms", min_value=100, max_value=60000, value=3000, step=100)
-        vision_max_tokens = st.number_input("Vision max output tokens", min_value=32, max_value=1024, value=384, step=32)
-        prompt = st.text_area("Optional vision prompt", value="", height=92)
+def render_event_history() -> None:
+    st.subheader("Event History")
+    st.write("Recent detection, review, reject, and assistant events are stored locally as JSONL.")
+    route_filter = st.selectbox("Route filter", ["all", "local", "remote", "reject"], index=0)
+    limit = st.number_input("Events to show", min_value=5, max_value=100, value=25, step=5)
+    events = load_recent_events(limit=int(limit), route_filter=route_filter)
 
-    if st.button("Route Vision Task", type="primary"):
-        if use_sample_mode:
-            result = select_vision_sample(task_type, privacy, quality)
-        else:
-            backend_source = "camera" if image_source == "Jetson camera" else "upload"
-            with st.spinner("Calling Jetson Gateway. Remote VLM routes can take 15-20 seconds."):
-                result = call_vision_backend(
-                    api_base_url,
-                    image_source=backend_source,
-                    image_path=image_path,
-                    task_type=task_type,
-                    privacy=privacy,
-                    quality=quality,
-                    latency_budget_ms=int(latency_budget_ms),
-                    prompt=prompt,
-                    max_tokens=int(vision_max_tokens),
-                )
+    if not events:
+        st.info("No events have been recorded yet. Run Live Monitor, Event Review, or Monitoring Assistant first.")
+        return
 
-        image_for_boxes = str(SAMPLE_IMAGE) if image_file is None else image_file
-        if result.get("image_base64"):
-            try:
-                image_for_boxes = BytesIO(base64.b64decode(result["image_base64"]))
-            except Exception:
-                image_for_boxes = str(SAMPLE_IMAGE)
-        precheck_detections = result.get("local_cv_precheck_detections") or result.get("detections", [])
-        precheck_labels = result.get("local_cv_precheck_labels") or result.get("detected_labels", [])
-        annotated = draw_detections(image_for_boxes, precheck_detections)
+    summary_rows = [
+        {
+            "timestamp": event.get("timestamp"),
+            "source": event.get("source"),
+            "task_type": event.get("task_type"),
+            "route": event.get("route"),
+            "selected_backend": event.get("selected_backend"),
+            "latency_ms": event.get("total_latency_ms"),
+            "error": event.get("error"),
+        }
+        for event in events
+    ]
+    st.dataframe(summary_rows, use_container_width=True)
 
-        st.markdown("### Local CV Precheck (Jetson)")
-        st.caption(
-            "This local detection runs before routing and provides fast edge-side visual evidence. "
-            "For remote semantic tasks, the final answer comes from the remote VLM, not from these boxes."
-        )
-        preview_col, cv_col = st.columns([1, 1])
-        with preview_col:
-            if annotated is not None:
-                caption = (
-                    "Camera frame with local YOLO precheck boxes"
-                    if image_source == "Jetson camera"
-                    else "Uploaded image with local CV precheck boxes"
-                )
-                if use_sample_mode and image_source == "sample image":
-                    caption = "Sample image with local CV precheck boxes"
-                st.image(annotated, caption=caption, use_container_width=True)
-            else:
-                st.warning("Sample image not available.")
-        with cv_col:
-            st.metric("Local CV inference ms", result.get("local_cv_inference_latency_ms") or "n/a")
-            st.json(
-                {
-                    "local_cv_backend": result.get("local_cv_backend"),
-                    "local_cv_model": result.get("local_cv_model"),
-                    "detected_labels": precheck_labels,
-                    "detections": precheck_detections,
-                    "capture_latency_ms": result.get("capture_latency_ms"),
-                    "local_cv_inference_latency_ms": result.get("local_cv_inference_latency_ms"),
-                    "local_cv_total_latency_ms": result.get("local_cv_total_latency_ms"),
-                }
-            )
-
-        st.markdown("### Routing Decision")
-        route_col, backend_col, latency_col = st.columns(3)
-        route_col.metric("Route", result.get("route", "unknown"))
-        backend_col.metric("Selected backend", result.get("selected_backend") or "none")
-        latency_col.metric("Total latency ms", result.get("total_latency_ms") or "n/a")
-        st.json(
-            {
-                "mode": result.get("mode"),
-                "privacy": privacy,
-                "quality": quality,
-                "remote_is_mock": result.get("remote_is_mock"),
-                "remote_latency_ms": result.get("remote_latency_ms"),
-                "status": result.get("status"),
-                "error": result.get("error"),
-                "max_tokens_used": result.get("max_tokens_used"),
-                "output_chars": result.get("output_chars"),
-                "reasons": result.get("reasons"),
-            }
-        )
-
-        st.markdown("### Final Routed Answer")
-        final_source = result.get("final_answer_source") or "unknown"
-        st.write(f"**Final answer source:** {final_source}")
-        route = result.get("route")
-        if route == "local":
-            st.info("Local CV detection/classification is the final answer for this task.")
-            st.json(
-                {
-                    "detected_labels": precheck_labels,
-                    "detections": precheck_detections,
-                }
-            )
-        elif route == "remote":
-            st.info("The final semantic answer comes from the RTX remote VLM. YOLO boxes above are only local pre-analysis.")
-            st.text_area(
-                "Remote VLM response",
-                value=result.get("final_answer_text") or result.get("remote_response_text", ""),
-                height=180,
-            )
-            if result.get("sample_truncated"):
-                st.warning(result.get("sample_truncation_note") or "Sample mode only stores a preview.")
-            with st.expander("Full remote VLM response", expanded=not result.get("sample_truncated")):
-                st.text_area(
-                    "Full remote VLM response text",
-                    value=result.get("full_response") or result.get("final_answer_text", ""),
-                    height=280,
-                    label_visibility="collapsed",
-                )
-        elif route == "reject":
-            st.warning("Policy rejected this request. No model answer was produced.")
-            st.json({"reject_reasons": result.get("reasons", [])})
-        else:
-            st.write(result.get("final_answer_text") or "")
+    for event in events:
+        title = f"{event.get('timestamp', '')} | {event.get('source', '')} | {event.get('route', '')}"
+        with st.expander(title):
+            image_path = event.get("image_path")
+            if image_path and Path(image_path).exists():
+                st.image(image_path, caption="Recorded event image", use_container_width=True)
+            st.json(event)
 
 
-def render_backend_panel(use_sample_mode: bool, api_base_url: str) -> None:
-    st.subheader("Backend Status")
-    st.caption(
-        "For real text remote routes, verify the Jetson Gateway, RTX remote llama-server, "
-        "and SSH tunnel are running before treating a fallback as a model failure."
-    )
+def _status_label(ready: bool | None, mock: bool | None = None) -> str:
+    if mock:
+        return "Mock"
+    if ready is True:
+        return "Ready"
+    if ready is False:
+        return "Unavailable"
+    return "Unknown"
+
+
+def render_system_status(use_sample_mode: bool, api_base_url: str) -> None:
+    st.subheader("System Status")
+    st.write("Operational view of the monitoring stack.")
     if use_sample_mode:
-        st.json(backend_status())
-    else:
-        st.json(real_backend_health(api_base_url))
+        status = backend_status()
+        st.info("Sample mode shows the expected backend roles, not live service health.")
+        st.json(status)
+        return
+
+    health = real_backend_health(api_base_url)
+    if not health.get("healthy"):
+        st.error("Jetson Gateway is unavailable.")
+        st.markdown(
+            "- Run `python3 demo/run_interactive_stack.py`\n"
+            "- Check the Router API base URL\n"
+            "- Run `python3 demo/check_interactive_stack.py`"
+        )
+        st.json(health)
+        return
+
+    response = health.get("response") or {}
+    local_ready = response.get("local_backend_available")
+    remote_ready = response.get("remote_backend_available")
+    vlm_ready = response.get("vision_remote_vlm_available")
+    vlm_mock = response.get("vision_remote_is_mock")
+
+    cols = st.columns(5)
+    cols[0].metric("Jetson Gateway", "Ready")
+    cols[1].metric("Jetson Local LLM", _status_label(local_ready))
+    cols[2].metric("Jetson Local CV", "Ready")
+    cols[3].metric("RTX Remote LLM", _status_label(remote_ready))
+    cols[4].metric("RTX Remote VLM", _status_label(vlm_ready, vlm_mock))
+    with st.expander("Raw health response"):
+        st.json(response)
 
 
-def render_results_panel() -> None:
-    st.subheader("Key Results Snapshot")
-    tables = key_result_tables()
-
-    st.markdown("**Model/backend scorecard recommendations**")
-    st.dataframe(tables["backend_recommendations"], use_container_width=True)
-
-    st.markdown("**Local CV runtime summary**")
-    st.dataframe(tables["local_cv_runtime_summary"], use_container_width=True)
-
-    st.markdown("**v0.7 reliability summary**")
-    st.dataframe(tables["reliability_summary"], use_container_width=True)
+def render_model_policy() -> None:
+    st.subheader("Model Policy")
+    st.write("Read-only explanation of the current monitoring backend choices.")
 
     st.markdown(
-        "- Qwen3.5 0.8B Q4_K_M is the Jetson local text default.\n"
-        "- ONNXRuntime session reuse reduced SSD total latency from about 4930 ms to about 49 ms.\n"
-        "- YOLOv8n TensorRT FP16 reduced local CV inference from 91.70 ms to 14.54 ms.\n"
-        "- v0.5b validated a real non-mock remote VLM path; v0.7 adds prototype reliability evidence."
+        """
+| Role | Default backend | Product meaning |
+| --- | --- | --- |
+| Jetson text default | Qwen3.5 0.8B Q4 | Local monitoring assistant responses when the task is short/private. |
+| RTX text fallback | Qwen3.5 4B Q4 | Heavier summaries, code/reasoning, and high-quality text review. |
+| Jetson local CV | YOLOv8n TensorRT FP16 | Local monitoring fast path for snapshots and object detection. |
+| MobileNet-SSD | OpenCV DNN baseline | v0.5 system integration baseline and fallback reference. |
+| RTX semantic vision | Gemma 4 E2B-it Q4 + mmproj | Event review and VQA when privacy permits image offload. |
+"""
+    )
+    st.markdown(
+        """
+- INT8 is treated as an experimental optimization because detection drift keeps it out of the default product path.
+- The C++ worker is a hot-path exploration, not the default workbench runtime.
+- The router keeps local / remote / reject decisions explicit so privacy and system constraints remain visible.
+"""
     )
 
 
 def main() -> None:
     use_sample_mode, api_base_url = render_header()
-    text_tab, vision_tab, status_tab, results_tab = st.tabs(
-        ["Text Router", "Vision Router", "Backend Status", "Results Snapshot"]
+    tabs = st.tabs(
+        [
+            "Live Monitor",
+            "Event Review",
+            "Monitoring Assistant",
+            "Event History",
+            "System Status",
+            "Model Policy",
+        ]
     )
-    with text_tab:
-        render_text_panel(use_sample_mode, api_base_url)
-    with vision_tab:
-        render_vision_panel(use_sample_mode, api_base_url)
-    with status_tab:
-        render_backend_panel(use_sample_mode, api_base_url)
-    with results_tab:
-        render_results_panel()
+    with tabs[0]:
+        render_live_monitor(use_sample_mode, api_base_url)
+    with tabs[1]:
+        render_event_review(use_sample_mode, api_base_url)
+    with tabs[2]:
+        render_monitoring_assistant(use_sample_mode, api_base_url)
+    with tabs[3]:
+        render_event_history()
+    with tabs[4]:
+        render_system_status(use_sample_mode, api_base_url)
+    with tabs[5]:
+        render_model_policy()
 
 
 if __name__ == "__main__":

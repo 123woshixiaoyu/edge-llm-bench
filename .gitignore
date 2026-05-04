@@ -17,6 +17,7 @@ results/raw/*.log
 results/raw/*.pid
 results/raw/*dryrun*.csv
 runtime_logs/
+runtime_data/
 
 # Python/editor noise
 __pycache__/

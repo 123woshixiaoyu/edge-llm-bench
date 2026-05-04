@@ -1,8 +1,20 @@
-# v0.9 Interactive Gateway Demo
+# v0.9 Monitoring Workbench Demo
 
-v0.9 turns the reviewer dashboard from evidence playback into an optional interactive client for the real Jetson Gateway.
+v0.9 turns the demo UI from evidence playback into a first-stage **Jetson Local-First Monitoring Gateway** workbench.
+
+The product direction is:
+
+> A local-first edge monitoring workbench that uses Jetson for low-latency local detection and routes event review / summaries to RTX backends only when privacy and system constraints allow.
 
 The main rule is that real requests go to the Jetson Gateway first. The UI does not call RTX services directly and does not duplicate routing policy.
+
+## Product Roles
+
+- **YOLO TensorRT** is the local monitoring fast path for camera snapshots and object detection.
+- **Remote VLM** is an event review tool, not a real-time monitoring engine.
+- **Text LLM** is the Monitoring Assistant for event summaries, policy explanations, and backend status questions.
+- **Router** remains responsible for local / remote / reject decisions.
+- **History** closes the product loop by recording detections, reviews, rejects, and assistant summaries.
 
 ## What Real Mode Exercises
 
@@ -99,7 +111,7 @@ The config expects:
 
 Remote VLM is real but slow. A semantic vision request can take about `15-20 s`, depending on prompt/image size and whether the remote CLI path has to load the model.
 
-## Dashboard
+## Workbench UI
 
 Start the dashboard from the repo root:
 
@@ -108,6 +120,15 @@ streamlit run demo/app.py
 ```
 
 The Router API base URL field defaults to the Jetson Gateway at `http://192.168.1.102:8000`, while the Streamlit UI itself typically opens at `http://127.0.0.1:8501`. Set `EDGE_GATEWAY_URL` before launch to use a different Jetson address.
+
+Tabs:
+
+- Live Monitor: capture/load a snapshot and run Jetson local YOLO TensorRT detection/classification.
+- Event Review: ask semantic questions about the current/recent snapshot, with privacy-safe reject behavior.
+- Monitoring Assistant: call the text backend for event summaries, policy explanations, and backend status questions.
+- Event History: show recent JSONL events and associated local images.
+- System Status: product-language health view for Jetson Gateway, local LLM/CV, RTX LLM, and RTX VLM.
+- Model Policy: read-only explanation of the backend choices.
 
 Modes:
 
@@ -127,6 +148,29 @@ FINAL_ANSWER:
 The server extracts text after `FINAL_ANSWER:` or llama.cpp's explicit final-channel marker when present. It does not perform broad string deletion; this keeps the output budget focused on the user-visible answer without hiding unmarked model behavior.
 
 Vision real mode is single-frame interaction. It is not a video stream and does not attempt continuous camera/VLM processing.
+
+## Event History
+
+The workbench writes runtime events to a lightweight local JSONL store:
+
+```text
+runtime_data/events/events.jsonl
+runtime_data/events/images/
+```
+
+`runtime_data/` is intentionally ignored by git. Each event records:
+
+- event id and timestamp
+- source: `live_monitor`, `event_review`, or `monitoring_assistant`
+- optional image path
+- prompt/task/privacy
+- route and selected backend
+- local CV labels and latency
+- remote and total latency
+- final answer text
+- policy reasons, errors, and mode
+
+This is the minimum product loop. It is not SQLite, a search system, or a production audit database.
 
 ## Smoke Test
 
@@ -154,7 +198,7 @@ If the remote VLM tunnel is intentionally down, add `--allow-remote-vlm-unavaila
 
 ## Limits
 
-- This is still a demo client, not a production UI.
+- This is still a workbench demo, not a production UI.
 - No login, database, cloud deployment, or video stream is included.
 - The UI does not bypass the router to call RTX.
 - Remote VLM serving remains subprocess/CLI-based unless a separate persistent VLM server is started.

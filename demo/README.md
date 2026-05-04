@@ -1,8 +1,19 @@
-# Lightweight Demo Dashboard
+# Monitoring Workbench Demo
 
-This is a reviewer-facing dashboard for the Jetson-First Edge AI Inference Gateway.
+This Streamlit demo presents the project as a **Jetson Local-First Monitoring Gateway**:
 
-The demo is intentionally thin: it does not duplicate the router implementation or require Jetson/RTX services in its default path. Sample mode reads committed CSV/image evidence from the project and shows how the gateway routes text and vision tasks across local, remote, and reject paths. Real mode calls the Jetson Gateway API.
+> A local-first edge monitoring workbench that uses Jetson for low-latency local detection and routes event review / summaries to RTX backends only when privacy and system constraints allow.
+
+The UI is intentionally thin. It calls the existing Jetson Gateway in real mode and reads committed evidence in sample mode. It does not duplicate router policy, download models, start a database, or bypass Jetson to call RTX directly.
+
+## Workbench Tabs
+
+- **Live Monitor**: capture or load a single snapshot and run the Jetson YOLO TensorRT local monitoring fast path.
+- **Event Review**: ask semantic questions about the current/recent snapshot. Privacy-safe mode rejects remote VLM review instead of sending the image out.
+- **Monitoring Assistant**: use the text router for event summaries, routing explanations, and backend status questions.
+- **Event History**: local JSONL event log for detections, reviews, rejects, and assistant summaries.
+- **System Status**: product-language health view for Jetson Gateway, local LLM/CV, RTX LLM, and RTX VLM.
+- **Model Policy**: read-only explanation of why each backend is used.
 
 ## Recommended Real-Mode Start
 
@@ -15,7 +26,7 @@ python3 demo/check_interactive_stack.py
 
 This starts the RTX-side remote LLM/VLM services, SSH reverse tunnels to Jetson, the Jetson local LLM, and the Jetson Gateway. Runtime logs and PID state are written under `runtime_logs/interactive_stack/`, which is intentionally ignored by git.
 
-Open the dashboard separately:
+Open the workbench separately:
 
 ```bash
 streamlit run demo/app.py
@@ -47,55 +58,44 @@ The old manual multi-terminal flow still works as a fallback: start the RTX remo
 ## Modes
 
 - **Sample mode**: default. Reads existing result files and the sample camera frame. No Jetson, RTX, model files, or TensorRT engine is required. Some sample rows only store response previews.
-- **Real backend mode**: optional. Text requests call `/v1/chat/completions`; vision requests call `/v1/vision/analyze`. If the backend is unavailable, the UI shows a friendly error or sample fallback instead of crashing. Real mode shows full model responses when the API returns them.
+- **Real backend mode**: optional. Live Monitor and Event Review call `/v1/vision/analyze`; Monitoring Assistant calls `/v1/chat/completions`. If the backend is unavailable, the UI shows a friendly error or sample fallback instead of crashing.
 
-`max_tokens` controls how many output tokens the model may generate. It is separate from `latency_budget_ms`, which is used by the router as a routing constraint. If an answer looks cut off, increase max output tokens; this can also increase latency.
+`max_tokens` controls how many output tokens the selected model may generate. It is separate from `latency_budget_ms`, which is used by the router as a routing constraint. If an answer looks cut off, increase max output tokens; this can also increase latency.
 
-Real text requests ask llama.cpp to disable template-level thinking when supported. Real remote VLM requests use a final-answer marker so the demo can show the final semantic answer instead of the model's intermediate reasoning text.
+`Request timeout seconds` is the UI client's wait limit for text responses. It is separate from `latency_budget_ms`: if the timeout is too small, the UI may show committed sample fallback even though the backend would have completed with more time.
 
-`Request timeout seconds` is the UI client's wait limit for text responses. It is separate from `latency_budget_ms`: if the timeout is too small, the UI may show a committed sample fallback even though the model/backend is still working. For remote text routes, check the Jetson Gateway, RTX llama-server, and SSH tunnel before treating a timeout as a model failure.
+## Product Flow
 
-## What It Shows
+- YOLO TensorRT is the local monitoring fast path for snapshot detection/classification.
+- VLM is an event review tool, not the real-time monitoring engine.
+- LLM is the Monitoring Assistant for summaries, policy explanations, and backend status questions.
+- Router decisions remain explicit: local, remote, or reject.
+- History closes the loop: detections, semantic reviews, rejects, and assistant summaries are recorded locally.
 
-- Text task routing across Jetson local LLM, RTX remote LLM, and reject paths.
-- Vision task routing across YOLOv8n TensorRT local CV, real remote VLM when available, and privacy rejects.
-- A clear split between **Local CV Precheck**, **Routing Decision**, and **Final Routed Answer**.
-- Backend status for the selected local/remote LLM/CV/VLM roles.
-- Key result snapshots for quantization, ONNXRuntime session reuse, YOLO TensorRT FP16, and v0.7 reliability.
+## Event History
 
-## Vision Answer Sources
+The demo stores local runtime events in:
 
-Vision requests can run a cheap Jetson local CV precheck even when the final route is remote.
+```text
+runtime_data/events/events.jsonl
+runtime_data/events/images/
+```
 
-- Local YOLO boxes and labels come from Jetson local YOLO TensorRT.
-- For `detect` / `classify` local routes, those labels/boxes are the final answer.
-- For `scene_description` / `vqa` remote routes, the final semantic answer comes from the RTX remote VLM.
-- For privacy rejects, no model answer is produced; the UI shows policy reasons.
-
-This separates cheap local perception from expensive semantic reasoning.
-
-## Current Limits
-
-- This is a dashboard, not a production serving layer.
-- Sample mode is evidence playback, not live inference.
-- Sample mode may only show stored previews; use real backend mode for full responses.
-- Real vision mode is single-frame interaction, not video streaming.
-- Remote VLM routes are real when the RTX VLM service/tunnel is running, but they can take 15-20 seconds.
-- Remote VLM requests default to a larger output budget than text preview rows because small budgets can be consumed by unwanted reasoning-style text.
-- No login, database, cloud deploy, video stream, model download, or new benchmark is included.
+This directory is intentionally ignored by git. Each event records source, task type, privacy, route, backend, local CV labels, latency, final answer text, reasons, errors, and mode. It is a lightweight product loop, not a production database.
 
 ## Real Mode Services
 
-Use `serving/configs_interactive_demo` for the Jetson Gateway:
-
-```bash
-EDGE_ROUTER_CONFIG_DIR=serving/configs_interactive_demo \
-uvicorn serving.app.main:app --host 127.0.0.1 --port 8000
-```
-
-Expected runtime services:
+Use `serving/configs_interactive_demo` for the Jetson Gateway. Expected runtime services:
 
 - Jetson local llama-server: `127.0.0.1:8080`
 - RTX remote llama-server tunnel: `127.0.0.1:18081`
 - Optional RTX remote VLM tunnel: `127.0.0.1:18091`
 - Jetson YOLO TensorRT engine: `/home/rainbow/models/vision/yolo_nano/yolov8n_fp16.engine`
+
+## Current Limits
+
+- This is a workbench demo, not production serving.
+- Sample mode is evidence playback, not live inference.
+- Real vision mode is single-frame interaction, not video streaming.
+- Remote VLM routes are real when the RTX VLM service/tunnel is running, but they can take 15-20 seconds.
+- No login, database, cloud deploy, video stream, model download, or new benchmark is included.
