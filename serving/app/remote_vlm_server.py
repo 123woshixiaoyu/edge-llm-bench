@@ -6,10 +6,11 @@ import subprocess
 import tempfile
 import time
 from pathlib import Path
+from typing import Any
 
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -24,6 +25,8 @@ class VisionCompletionRequest(BaseModel):
     image_path: str | None = None
     prompt: str = "Describe the image in one short sentence."
     max_tokens: int = 128
+    resize_width: int | None = None
+    mode: str = "subprocess_cli_mode"
 
 
 class VisionCompletionResponse(BaseModel):
@@ -32,6 +35,10 @@ class VisionCompletionResponse(BaseModel):
     text: str
     latency_ms: float
     error: str = ""
+    timings: dict[str, Any] = Field(default_factory=dict)
+    resized_width: int | None = None
+    resized_height: int | None = None
+    mode: str = "subprocess_cli_mode"
 
 
 def settings() -> dict[str, str]:
@@ -84,28 +91,56 @@ def clean_generation(stdout: str, stderr: str) -> str:
     return cleaned[:4000]
 
 
-def write_request_image(request: VisionCompletionRequest) -> tuple[Path | None, str]:
+def resize_image_if_requested(path: Path, resize_width: int | None) -> tuple[Path, int | None, int | None, float, str]:
+    if not resize_width or resize_width <= 0:
+        return path, None, None, 0.0, ""
+    start = time.perf_counter()
+    try:
+        from PIL import Image
+
+        with Image.open(path) as image:
+            width, height = image.size
+            if width <= resize_width:
+                return path, width, height, round((time.perf_counter() - start) * 1000, 2), ""
+            new_height = max(1, int(round(height * (resize_width / width))))
+            resized = image.convert("RGB").resize((resize_width, new_height))
+            tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".jpg")
+            with tmp:
+                resized.save(tmp.name, format="JPEG", quality=90)
+            return Path(tmp.name), resize_width, new_height, round((time.perf_counter() - start) * 1000, 2), ""
+    except Exception as exc:
+        return path, None, None, round((time.perf_counter() - start) * 1000, 2), f"resize failed: {exc}"
+
+
+def write_request_image(request: VisionCompletionRequest) -> tuple[Path | None, str, dict[str, Any], bool]:
+    timings: dict[str, Any] = {}
     if request.image_base64:
+        start_decode = time.perf_counter()
         suffix = ".jpg"
         if "png" in request.image_mime_type.lower():
             suffix = ".png"
         try:
             image_bytes = base64.b64decode(request.image_base64, validate=True)
         except Exception as exc:
-            return None, f"invalid base64 image: {exc}"
+            return None, f"invalid base64 image: {exc}", timings, False
+        timings["server_base64_decode_ms"] = round((time.perf_counter() - start_decode) * 1000, 2)
+        start_write = time.perf_counter()
         tmp = tempfile.NamedTemporaryFile(delete=False, suffix=suffix)
         with tmp:
             tmp.write(image_bytes)
-        return Path(tmp.name), ""
+        timings["server_image_write_ms"] = round((time.perf_counter() - start_write) * 1000, 2)
+        return Path(tmp.name), "", timings, True
     if request.image_path:
         path = Path(request.image_path)
         if path.exists():
-            return path, ""
-        return None, f"image_path does not exist on remote server: {request.image_path}"
-    return None, "image_base64 or image_path is required"
+            timings["server_base64_decode_ms"] = 0.0
+            timings["server_image_write_ms"] = 0.0
+            return path, "", timings, False
+        return None, f"image_path does not exist on remote server: {request.image_path}", timings, False
+    return None, "image_base64 or image_path is required", timings, False
 
 
-def run_vlm(image_path: Path, request: VisionCompletionRequest) -> VisionCompletionResponse:
+def run_vlm(image_path: Path, request: VisionCompletionRequest, timings: dict[str, Any], resized_width: int | None, resized_height: int | None) -> VisionCompletionResponse:
     cfg = settings()
     prompt = (
         "Answer directly in natural language. Do not mention hidden reasoning. "
@@ -142,6 +177,11 @@ def run_vlm(image_path: Path, request: VisionCompletionRequest) -> VisionComplet
             timeout=float(os.environ.get("VLM_SUBPROCESS_TIMEOUT_S", "180")),
         )
         latency_ms = (time.perf_counter() - start) * 1000
+        timings["server_subprocess_ms"] = round(latency_ms, 2)
+        timings["server_total_ms"] = round(
+            sum(float(timings.get(key, 0.0)) for key in ("server_base64_decode_ms", "server_image_write_ms", "server_resize_ms", "server_subprocess_ms")),
+            2,
+        )
         text = clean_generation(proc.stdout, proc.stderr)
         if proc.returncode != 0:
             error = (proc.stderr or proc.stdout).strip()[:1000]
@@ -151,6 +191,10 @@ def run_vlm(image_path: Path, request: VisionCompletionRequest) -> VisionComplet
                 text=text,
                 latency_ms=round(latency_ms, 2),
                 error=error,
+                timings=timings,
+                resized_width=resized_width,
+                resized_height=resized_height,
+                mode=request.mode,
             )
         if not text:
             text = clean_generation(proc.stderr, "")
@@ -160,15 +204,28 @@ def run_vlm(image_path: Path, request: VisionCompletionRequest) -> VisionComplet
             text=text,
             latency_ms=round(latency_ms, 2),
             error="",
+            timings=timings,
+            resized_width=resized_width,
+            resized_height=resized_height,
+            mode=request.mode,
         )
     except Exception as exc:
         latency_ms = (time.perf_counter() - start) * 1000
+        timings["server_subprocess_ms"] = round(latency_ms, 2)
+        timings["server_total_ms"] = round(
+            sum(float(timings.get(key, 0.0)) for key in ("server_base64_decode_ms", "server_image_write_ms", "server_resize_ms", "server_subprocess_ms")),
+            2,
+        )
         return VisionCompletionResponse(
             ok=False,
             model=cfg["model_name"],
             text="",
             latency_ms=round(latency_ms, 2),
             error=str(exc),
+            timings=timings,
+            resized_width=resized_width,
+            resized_height=resized_height,
+            mode=request.mode,
         )
 
 
@@ -193,8 +250,8 @@ def health() -> dict:
 
 @app.post("/v1/vision/completions", response_model=VisionCompletionResponse)
 def vision_completions(request: VisionCompletionRequest):
-    image_path, error = write_request_image(request)
-    temporary = bool(request.image_base64 and image_path)
+    request_start = time.perf_counter()
+    image_path, error, timings, temporary = write_request_image(request)
     if error or image_path is None:
         return JSONResponse(
             status_code=400,
@@ -204,13 +261,27 @@ def vision_completions(request: VisionCompletionRequest):
                 text="",
                 latency_ms=0.0,
                 error=error,
+                timings=timings,
+                mode=request.mode,
             ).model_dump(),
         )
+    resized_temporary = False
     try:
-        result = run_vlm(image_path, request)
+        resized_path, resized_width, resized_height, resize_ms, resize_error = resize_image_if_requested(image_path, request.resize_width)
+        timings["server_resize_ms"] = resize_ms
+        if resize_error:
+            timings["server_resize_error"] = resize_error
+        resized_temporary = resized_path != image_path
+        result = run_vlm(resized_path, request, timings, resized_width, resized_height)
+        result.timings["server_endpoint_total_ms"] = round((time.perf_counter() - request_start) * 1000, 2)
         status_code = 200 if result.ok else 502
         return JSONResponse(status_code=status_code, content=result.model_dump())
     finally:
+        if resized_temporary:
+            try:
+                resized_path.unlink(missing_ok=True)
+            except Exception:
+                pass
         if temporary:
             try:
                 image_path.unlink(missing_ok=True)

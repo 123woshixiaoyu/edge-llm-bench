@@ -12,6 +12,7 @@ This project is a Jetson-first edge AI inference gateway, not a single-model dem
 - **Project 3:** local CV runtime optimization with ONNXRuntime, TensorRT FP16, INT8 calibration, and a C++ worker benchmark.
 - **v0.6/v0.7:** optimized YOLO TensorRT backend integrated into the vision router, then checked with a small reliability benchmark.
 - **Demo dashboard:** lightweight Streamlit sample-mode UI for reviewer walkthroughs.
+- **Remote VLM profiling:** latency breakdown and low-risk resize/prompt defaults for the Gemma VLM path.
 
 Model responsibilities are intentionally separated:
 
@@ -87,6 +88,7 @@ Source: [serving/docs/project3_tensorrt_report.md](serving/docs/project3_tensorr
 | v0.5b real remote VLM | Gemma 4 multimodal backend is real, not mock | 10/10 routes, `remote_is_mock=false` |
 | v0.6 YOLO TensorRT router | Optimized local CV backend is used by router | 10/10 routes, `fallback_used=false` |
 | v0.7 reliability benchmark | Queue/fallback/reject/timeout behavior is explainable | 80 benchmark requests, pass rate 1.0 at concurrency 1/2/4/8; 9/9 failure modes |
+| v0.8 remote VLM profiling | Gemma VLM subprocess latency is measured and reduced with resize/prompt defaults | About 19.0 s baseline to about 16.7-17.2 s recommended config |
 
 Source: [serving/docs/reliability_report.md](serving/docs/reliability_report.md)
 
@@ -146,6 +148,7 @@ Runtime assets are intentionally outside git:
 - [serving/docs/vision_routing_design.md](serving/docs/vision_routing_design.md)
 - [serving/docs/project3_tensorrt_report.md](serving/docs/project3_tensorrt_report.md)
 - [serving/docs/cpp_tensorrt_adapter.md](serving/docs/cpp_tensorrt_adapter.md)
+- [serving/docs/remote_vlm_latency_optimization.md](serving/docs/remote_vlm_latency_optimization.md)
 - [serving/docs/reliability_report.md](serving/docs/reliability_report.md)
 - [serving/docs/serving_design.md](serving/docs/serving_design.md)
 - [serving/docs/routing_policy.md](serving/docs/routing_policy.md)
@@ -163,5 +166,5 @@ Runtime assets are intentionally outside git:
 
 ## Next Steps
 
-- Remote VLM latency profiling and low-risk optimization.
+- Persistent remote VLM serving to replace subprocess CLI mode.
 - Optional dashboard real-backend wiring for the vision path.
