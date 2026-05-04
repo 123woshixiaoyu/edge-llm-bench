@@ -135,6 +135,7 @@ Main entry points:
 - Reliability benchmark: `python3 serving/scripts/reliability_benchmark.py --mode vision --concurrency 1,2,4,8 --requests 20`
 - Interactive demo stack: `python3 demo/run_interactive_stack.py`, then `python3 demo/check_interactive_stack.py`
 - Monitoring Workbench: `streamlit run demo/app.py` or `python3 demo/run_interactive_stack.py --with-ui`
+- Monitoring Workbench real-mode validation: [docs/monitoring_workbench_real_mode_validation.md](docs/monitoring_workbench_real_mode_validation.md)
 - Interactive gateway smoke: `python3 serving/scripts/smoke_interactive_gateway.py --url http://127.0.0.1:8000`
 - Interactive demo notes: [serving/docs/interactive_gateway_demo.md](serving/docs/interactive_gateway_demo.md)
 - Setup notes: [docs/setup_requirements.md](docs/setup_requirements.md)
@@ -158,6 +159,7 @@ If this repository stays private, public viewers will see a GitHub `404`. Before
 - [docs/quantization_decision_study.md](docs/quantization_decision_study.md)
 - [docs/setup_requirements.md](docs/setup_requirements.md)
 - [docs/submission_checklist.md](docs/submission_checklist.md)
+- [docs/monitoring_workbench_real_mode_validation.md](docs/monitoring_workbench_real_mode_validation.md)
 - [serving/docs/vision_routing_design.md](serving/docs/vision_routing_design.md)
 - [serving/docs/project3_tensorrt_report.md](serving/docs/project3_tensorrt_report.md)
 - [serving/docs/cpp_tensorrt_adapter.md](serving/docs/cpp_tensorrt_adapter.md)

@@ -89,17 +89,34 @@ def main() -> int:
             inactive.append(f"{name}:{service_status}")
             continue
         ok, data, error = http_json(url, timeout_s=5)
-        all_ready = all_ready and ok
+        endpoint_ready = ok
         print(f"- {name}: ready={ok} url={url}")
         if data and name == "jetson_gateway":
-            print(f"  local_backend_available={data.get('local_backend_available')}")
-            print(f"  remote_backend_available={data.get('remote_backend_available')}")
-            print(f"  vision_remote_vlm_available={data.get('vision_remote_vlm_available')}")
-            print(f"  vision_remote_is_mock={data.get('vision_remote_is_mock')}")
+            local_backend_available = data.get("local_backend_available")
+            remote_backend_available = data.get("remote_backend_available")
+            vision_remote_vlm_available = data.get("vision_remote_vlm_available")
+            vision_remote_is_mock = data.get("vision_remote_is_mock")
+            print(f"  local_backend_available={local_backend_available}")
+            print(f"  remote_backend_available={remote_backend_available}")
+            print(f"  vision_remote_vlm_available={vision_remote_vlm_available}")
+            print(f"  vision_remote_is_mock={vision_remote_is_mock}")
+            services = state.get("services", {})
+            remote_llm_skipped = services.get("remote_llm", {}).get("status") == "skipped"
+            remote_vlm_skipped = services.get("remote_vlm", {}).get("status") == "skipped"
+            endpoint_ready = (
+                ok
+                and local_backend_available is True
+                and (remote_llm_skipped or remote_backend_available is True)
+                and (remote_vlm_skipped or vision_remote_vlm_available is True)
+                and (remote_vlm_skipped or vision_remote_is_mock is False)
+            )
         elif data:
             print(f"  status={data.get('status', 'ok')} model={data.get('model')}")
         if error and not ok:
             print(f"  error={error}")
+        if ok and name == "jetson_gateway" and not endpoint_ready:
+            print("  error=gateway is reachable, but one or more required backends are unavailable")
+        all_ready = all_ready and endpoint_ready
 
     if not all_ready:
         print("\nNot all services are ready. Check runtime_logs/interactive_stack/, SSH connectivity, and model paths.")

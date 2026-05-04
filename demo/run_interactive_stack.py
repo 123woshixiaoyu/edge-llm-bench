@@ -232,14 +232,24 @@ def main() -> int:
         tunnel_forwards.extend(["-R", "18091:127.0.0.1:8091"])
     if tunnel_forwards:
         existing_tunnel = pgrep("ssh .*18081:127.0.0.1:8081|ssh .*18091:127.0.0.1:8091")
-        if existing_tunnel:
+        tunnel_ready = True
+        if not args.skip_remote_llm:
+            tunnel_ready = tunnel_ready and remote_http_ready(args.jetson_host, "http://127.0.0.1:18081/health")
+        if not args.skip_remote_vlm:
+            tunnel_ready = tunnel_ready and remote_http_ready(args.jetson_host, "http://127.0.0.1:18091/health")
+        if existing_tunnel and tunnel_ready:
             services["ssh_reverse_tunnel"] = record_already_ready("ssh_reverse_tunnel", "local", existing_tunnel)
         else:
             services["ssh_reverse_tunnel"] = start_local(
                 "ssh_reverse_tunnel",
-                ["ssh", "-N", *tunnel_forwards, args.jetson_host],
+                ["ssh", "-N", "-o", "ExitOnForwardFailure=yes", *tunnel_forwards, args.jetson_host],
                 "ssh_reverse_tunnel.log",
             )
+            if existing_tunnel and not tunnel_ready:
+                services["ssh_reverse_tunnel"]["note"] = (
+                    "An existing tunnel process was found but Jetson could not reach the forwarded ports, "
+                    "so a new managed tunnel was started."
+                )
     else:
         services["ssh_reverse_tunnel"] = {"name": "ssh_reverse_tunnel", "status": "skipped", "managed": False}
 
