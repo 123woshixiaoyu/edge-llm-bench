@@ -34,6 +34,10 @@ Request fields:
 - `use_yolo_trt`, default true
 - `max_tokens`
 
+`max_tokens` is the output budget passed to the selected model backend. It is not the same as `latency_budget_ms`: the latency budget helps the router choose local/remote/reject, while `max_tokens` controls how long the generated answer may be. Larger values reduce cutoff risk but can increase latency.
+
+For text llama.cpp backends, the gateway sends `chat_template_kwargs={"enable_thinking": false}` so the demo output budget is spent on the user-visible answer instead of template-level thinking text.
+
 Response fields include:
 
 - route decision and reasons
@@ -85,6 +89,16 @@ Modes:
 
 Sample mode may only show stored previews because CSV evidence intentionally avoids storing long generations. Real backend mode displays full model responses when the API returns them.
 
+For remote VLM calls, the demo uses a final-answer-only prompt style and appends a `FINAL_ANSWER:` marker before generation:
+
+```text
+Return only the final answer. Do not include reasoning, thinking process, analysis steps, constraints, or hidden chain-of-thought.
+<user prompt>
+FINAL_ANSWER:
+```
+
+The server extracts text after `FINAL_ANSWER:` or llama.cpp's explicit final-channel marker when present. It does not perform broad string deletion; this keeps the output budget focused on the user-visible answer without hiding unmarked model behavior.
+
 Vision real mode is single-frame interaction. It is not a video stream and does not attempt continuous camera/VLM processing.
 
 ## Smoke Test
@@ -96,6 +110,16 @@ python3 serving/scripts/smoke_interactive_gateway.py \
   --url http://127.0.0.1:8000 \
   --out serving/results/raw/interactive_gateway_smoke.csv
 ```
+
+To validate output length behavior:
+
+```bash
+python3 serving/scripts/smoke_interactive_output_lengths.py \
+  --url http://127.0.0.1:8000 \
+  --out serving/results/raw/interactive_output_length_smoke.csv
+```
+
+This compares text `128` vs `512` output tokens and vision VLM `128` vs `384` output tokens.
 
 For non-Jetson development, use `--image-source upload` so the script sends the committed sample image as base64. On Jetson, the default `camera` source captures a real CSI frame.
 

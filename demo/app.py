@@ -58,12 +58,21 @@ def render_text_panel(use_sample_mode: bool, api_base_url: str) -> None:
         privacy = st.selectbox("Privacy", ["allow_remote", "local_only"], index=0)
         quality = st.selectbox("Quality", ["low", "medium", "high"], index=1)
         latency_budget_ms = st.number_input("Latency budget ms", min_value=100, max_value=20000, value=3000, step=100)
+        max_tokens = st.number_input("Max output tokens", min_value=32, max_value=2048, value=512, step=32)
 
     if st.button("Route Text Task", type="primary"):
         if use_sample_mode:
             result = select_text_sample(prompt, task_type, privacy, quality, int(latency_budget_ms))
         else:
-            result = call_text_backend(api_base_url, prompt, task_type, privacy, quality, int(latency_budget_ms))
+            result = call_text_backend(
+                api_base_url,
+                prompt,
+                task_type,
+                privacy,
+                quality,
+                int(latency_budget_ms),
+                int(max_tokens),
+            )
 
         route_col, backend_col, latency_col = st.columns(3)
         route_col.metric("Route", result.get("route", "unknown"))
@@ -75,6 +84,8 @@ def render_text_panel(use_sample_mode: bool, api_base_url: str) -> None:
                 "backend_latency_ms": result.get("backend_latency_ms"),
                 "sample_request_id": result.get("sample_request_id"),
                 "sample_source": result.get("sample_source"),
+                "max_tokens_used": result.get("max_tokens_used"),
+                "output_chars": result.get("output_chars"),
                 "reasons": result.get("reasons", []),
             }
         )
@@ -108,6 +119,7 @@ def render_vision_panel(use_sample_mode: bool, api_base_url: str) -> None:
         privacy = st.selectbox("Vision privacy", ["allow_remote", "local_only"], index=0)
         quality = st.selectbox("Vision quality", ["low", "medium", "high"], index=0)
         latency_budget_ms = st.number_input("Vision latency budget ms", min_value=100, max_value=60000, value=3000, step=100)
+        vision_max_tokens = st.number_input("Vision max output tokens", min_value=32, max_value=1024, value=384, step=32)
         prompt = st.text_area("Optional vision prompt", value="", height=92)
 
     if st.button("Route Vision Task", type="primary"):
@@ -125,6 +137,7 @@ def render_vision_panel(use_sample_mode: bool, api_base_url: str) -> None:
                     quality=quality,
                     latency_budget_ms=int(latency_budget_ms),
                     prompt=prompt,
+                    max_tokens=int(vision_max_tokens),
                 )
 
         image_for_boxes = str(SAMPLE_IMAGE) if image_file is None else image_file
@@ -183,6 +196,8 @@ def render_vision_panel(use_sample_mode: bool, api_base_url: str) -> None:
                 "remote_latency_ms": result.get("remote_latency_ms"),
                 "status": result.get("status"),
                 "error": result.get("error"),
+                "max_tokens_used": result.get("max_tokens_used"),
+                "output_chars": result.get("output_chars"),
                 "reasons": result.get("reasons"),
             }
         )

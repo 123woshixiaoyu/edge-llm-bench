@@ -17,6 +17,10 @@ streamlit run demo/app.py
 - **Sample mode**: default. Reads existing result files and the sample camera frame. No Jetson, RTX, model files, or TensorRT engine is required. Some sample rows only store response previews.
 - **Real backend mode**: optional. Text requests call `/v1/chat/completions`; vision requests call `/v1/vision/analyze`. If the backend is unavailable, the UI shows a friendly error or sample fallback instead of crashing. Real mode shows full model responses when the API returns them.
 
+`max_tokens` controls how many output tokens the model may generate. It is separate from `latency_budget_ms`, which is used by the router as a routing constraint. If an answer looks cut off, increase max output tokens; this can also increase latency.
+
+Real text requests ask llama.cpp to disable template-level thinking when supported. Real remote VLM requests use a final-answer marker so the demo can show the final semantic answer instead of the model's intermediate reasoning text.
+
 ## What It Shows
 
 - Text task routing across Jetson local LLM, RTX remote LLM, and reject paths.
@@ -43,6 +47,7 @@ This separates cheap local perception from expensive semantic reasoning.
 - Sample mode may only show stored previews; use real backend mode for full responses.
 - Real vision mode is single-frame interaction, not video streaming.
 - Remote VLM routes are real when the RTX VLM service/tunnel is running, but they can take 15-20 seconds.
+- Remote VLM requests default to a larger output budget than text preview rows because small budgets can be consumed by unwanted reasoning-style text.
 - No login, database, cloud deploy, video stream, model download, or new benchmark is included.
 
 ## Real Mode Services

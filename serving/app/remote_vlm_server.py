@@ -88,6 +88,10 @@ def clean_generation(stdout: str, stderr: str) -> str:
         cleaned = cleaned.split("<|channel>final", 1)[1].strip()
     if "<|channel>thought" in cleaned and "<|channel>final" not in cleaned:
         cleaned = cleaned.replace("<|channel>thought", "").strip()
+    if "FINAL_ANSWER:" in cleaned:
+        cleaned = cleaned.split("FINAL_ANSWER:", 1)[1].strip()
+    if "<channel|>" in cleaned:
+        cleaned = cleaned.rsplit("<channel|>", 1)[1].strip()
     return cleaned[:4000]
 
 
@@ -143,8 +147,10 @@ def write_request_image(request: VisionCompletionRequest) -> tuple[Path | None, 
 def run_vlm(image_path: Path, request: VisionCompletionRequest, timings: dict[str, Any], resized_width: int | None, resized_height: int | None) -> VisionCompletionResponse:
     cfg = settings()
     prompt = (
-        "Answer directly in natural language. Do not mention hidden reasoning. "
-        + request.prompt.strip()
+        "Return only the final answer. "
+        "Do not include reasoning, thinking process, analysis steps, constraints, or hidden chain-of-thought.\n\n"
+        f"{request.prompt.strip()}\n\n"
+        "FINAL_ANSWER:"
     )
     cmd = [
         cfg["cli"],

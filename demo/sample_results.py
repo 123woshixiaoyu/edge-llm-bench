@@ -106,6 +106,8 @@ def select_text_sample(
             "response_preview": "No sample row is available for this request.",
             "full_response": "No sample row is available for this request.",
             "sample_truncated": True,
+            "max_tokens_used": "sample",
+            "output_chars": len("No sample row is available for this request."),
             "reasons": ["sample data unavailable"],
             "input_preview": prompt[:120],
         }
@@ -121,6 +123,8 @@ def select_text_sample(
         "full_response": preview,
         "sample_truncated": True,
         "sample_truncation_note": _sample_preview_notice(),
+        "max_tokens_used": "sample",
+        "output_chars": len(preview),
         "reasons": [reason.strip() for reason in row.get("reasons", "").split(";") if reason.strip()],
         "input_preview": prompt[:120],
         "sample_request_id": row.get("request_id", ""),
@@ -135,6 +139,7 @@ def call_text_backend(
     privacy: str,
     quality: str,
     latency_budget_ms: int,
+    max_tokens: int,
 ) -> dict[str, Any]:
     payload = {
         "messages": [{"role": "user", "content": prompt}],
@@ -143,7 +148,7 @@ def call_text_backend(
         "quality": quality,
         "latency_budget_ms": latency_budget_ms,
         "stream": False,
-        "max_tokens": 128,
+        "max_tokens": max_tokens,
     }
     start = time.perf_counter()
     try:
@@ -170,6 +175,8 @@ def call_text_backend(
             "response_preview": message[:500] or raw[:500],
             "full_response": message or raw,
             "sample_truncated": False,
+            "max_tokens_used": max_tokens,
+            "output_chars": len(message or raw),
             "reasons": decision.get("reasons", ["real backend response did not include route reasons"]),
             "input_preview": prompt[:120],
         }
@@ -186,6 +193,8 @@ def call_text_backend(
                 "response_preview": data.get("error", str(exc)),
                 "full_response": data.get("error", str(exc)),
                 "sample_truncated": False,
+                "max_tokens_used": max_tokens,
+                "output_chars": len(data.get("error", str(exc))),
                 "reasons": decision.get("reasons", [data.get("error", str(exc))]),
                 "input_preview": prompt[:120],
             }
@@ -223,6 +232,8 @@ def select_vision_sample(task_type: str, privacy: str, quality: str) -> dict[str
             "final_answer_text": "No sample row is available for this request.",
             "full_response": "No sample row is available for this request.",
             "sample_truncated": True,
+            "max_tokens_used": "sample",
+            "output_chars": len("No sample row is available for this request."),
             "reasons": ["sample data unavailable"],
         }
 
@@ -262,6 +273,8 @@ def select_vision_sample(task_type: str, privacy: str, quality: str) -> dict[str
         "full_response": final_text,
         "sample_truncated": True,
         "sample_truncation_note": _sample_preview_notice(),
+        "max_tokens_used": "sample",
+        "output_chars": len(final_text),
         "reasons": reasons,
         "sample_request_id": row.get("request_id", ""),
         "sample_source": str(VISION_SMOKE_CSV.relative_to(REPO_ROOT)),
@@ -290,6 +303,7 @@ def call_vision_backend(
     quality: str,
     latency_budget_ms: int,
     prompt: str,
+    max_tokens: int,
     timeout_s: float = 260.0,
 ) -> dict[str, Any]:
     payload: dict[str, Any] = {
@@ -300,7 +314,7 @@ def call_vision_backend(
         "prompt": prompt or None,
         "image_source": "camera" if image_source == "camera" else "upload",
         "use_yolo_trt": True,
-        "max_tokens": 96,
+        "max_tokens": max_tokens,
     }
     if image_source != "camera":
         image_b64 = _encode_image_file(image_path)
@@ -344,6 +358,8 @@ def call_vision_backend(
         data["final_answer_text"] = final_text
         data["full_response"] = remote_text or final_text
         data["sample_truncated"] = False
+        data["max_tokens_used"] = max_tokens
+        data["output_chars"] = len(data["full_response"])
         return data
     except urllib.error.HTTPError as exc:
         try:
@@ -366,6 +382,8 @@ def call_vision_backend(
             data["final_answer_text"] = final_text
             data["full_response"] = data.get("remote_response_text") or final_text
             data["sample_truncated"] = False
+            data["max_tokens_used"] = max_tokens
+            data["output_chars"] = len(data["full_response"])
             return data
         except Exception:
             sample = select_vision_sample(task_type, privacy, quality)

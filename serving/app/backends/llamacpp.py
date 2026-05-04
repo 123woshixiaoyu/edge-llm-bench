@@ -27,6 +27,7 @@ class LlamaCppBackend:
             "messages": [message.model_dump() for message in messages],
             "stream": False,
             "temperature": 0,
+            "chat_template_kwargs": {"enable_thinking": False},
         }
         if max_tokens is not None:
             payload["max_tokens"] = max_tokens
