@@ -2,7 +2,7 @@
 
 ## Goal
 
-Project 3 will optimize the v0.5 local CV baseline for Jetson deployment. It should compare the same model across increasingly optimized runtimes:
+Project 3 optimizes the v0.5 local CV path for Jetson deployment. The plan is to compare practical detector runtimes rather than force one model through every toolchain:
 
 1. PyTorch or original framework reference, if practical;
 2. ONNX export or equivalent ONNX model;
@@ -26,7 +26,7 @@ Why this model:
 - it runs without PyTorch or TensorRT;
 - it supports object detection rather than only image classification;
 - it gives a simple local CV result that the vision router can use immediately;
-- its small input size makes it a reasonable first TensorRT optimization target.
+- its small input size makes it a stable router baseline.
 
 Current v0.5a runtime:
 
@@ -50,7 +50,7 @@ Project 3 should measure:
 - power and temperature through `tegrastats`;
 - detection count and basic label consistency on a fixed image set.
 
-## Phase 1 Update
+## Phase 1 / 1.5 Update
 
 Phase 1 keeps MobileNet-SSD as the v0.5 local CV baseline and uses an ONNX Model Zoo SSD-MobileNetV1 model for ONNXRuntime / TensorRT feasibility:
 
@@ -58,7 +58,7 @@ Phase 1 keeps MobileNet-SSD as the v0.5 local CV baseline and uses an ONNX Model
 /home/rainbow/models/vision/ssd_mobilenet_onnx/ssd_mobilenet_v1_10.onnx
 ```
 
-This avoids brittle Caffe-to-ONNX conversion while staying in the same SSD-MobileNet detector family. YOLO-nano remains a backup option for a future phase, but it was not needed for Phase 1.
+This avoids brittle Caffe-to-ONNX conversion while staying in the same SSD-MobileNet detector family. Phase 1.5 then showed that ONNXRuntime session reuse removes a large serving adapter overhead: total latency dropped from `4929.98 ms` to `49.04 ms`.
 
 Phase 1 outputs:
 
@@ -79,22 +79,45 @@ Current path:
 
 ## TensorRT FP16 Plan
 
+Phase 2 decision:
+
+SSD-MobileNetV1 ONNX was attempted after TensorRT was installed, but TensorRT 10.3 failed to create an engine with an internal Myelin graph compatibility error:
+
+```text
+Device to shape host node should not be folded into myelin.
+Engine could not be created from network.
+```
+
+The v0.5 router baseline therefore remains MobileNet-SSD, while the Project 3 TensorRT optimization object switches to YOLOv8n ONNX:
+
+```text
+/home/rainbow/models/vision/yolo_nano/yolov8n.onnx
+```
+
+YOLOv8n was chosen because it is small, detects common COCO objects, and follows a mature ONNX -> TensorRT deployment path on Jetson.
+
 Steps:
 
-1. Use the SSD-MobileNetV1 ONNX model from Phase 1.
-2. Install TensorRT packages on Jetson if missing.
-3. Build TensorRT FP16 engine on Jetson.
-3. Benchmark the same image set used for ONNXRuntime.
-4. Compare latency, memory, and power against OpenCV DNN and ONNXRuntime.
+1. Keep MobileNet-SSD/OpenCV DNN as the v0.5 router baseline.
+2. Build YOLOv8n TensorRT FP16 engine on Jetson.
+3. Benchmark YOLOv8n ONNXRuntime CPU reuse and YOLOv8n TensorRT FP16 on the same camera sample.
+4. Compare latency and detection consistency within the YOLO model family.
 
 Expected benefit: lower inference latency and better throughput on Jetson GPU, with minimal accuracy change relative to FP32/ONNX.
 
-Current Phase 1 blocker:
+Phase 2 engine build command:
 
-```text
-trtexec not found
-TensorRT apt candidate: tensorrt 10.3.0.30-1+cuda12.5
+```bash
+env LD_LIBRARY_PATH=/usr/lib/aarch64-linux-gnu/nvidia:/usr/local/cuda/targets/aarch64-linux/lib \
+  /usr/src/tensorrt/bin/trtexec \
+  --onnx=/home/rainbow/models/vision/yolo_nano/yolov8n.onnx \
+  --saveEngine=/home/rainbow/models/vision/yolo_nano/yolov8n_fp16.engine \
+  --fp16 \
+  --memPoolSize=workspace:1024 \
+  --skipInference
 ```
+
+Current Phase 2 result: YOLOv8n TensorRT FP16 runs successfully and lowers average inference latency from `91.70 ms` with YOLO ONNXRuntime CPU reuse to `14.54 ms`.
 
 ## TensorRT INT8 Plan
 
@@ -105,12 +128,12 @@ Steps:
 3. Verify label consistency against FP16 on the same images.
 4. Benchmark latency, FPS, memory, and power.
 
-Expected benefit: lower memory bandwidth and potentially better FPS. Risk is larger accuracy drift, especially on small or low-light objects.
+Expected benefit: lower memory bandwidth and potentially better FPS. Risk is larger accuracy drift, especially on small or low-light objects. Phase 3 should use YOLOv8n as the INT8 target, because the FP16 engine is already working.
 
 ## Risks
 
 - Jetson TensorRT and CUDA versions may constrain ONNX opset support.
-- Caffe MobileNet-SSD conversion to ONNX may be less clean than starting from a modern ONNX-native model.
+- Older detector graphs such as SSD-MobileNetV1 can hit TensorRT graph compatibility blockers even after the toolchain is installed.
 - INT8 calibration needs representative, non-sensitive images.
 - Camera exposure and low-light scenes can dominate detection quality, hiding runtime differences.
 - TensorRT build time and engine portability can slow iteration.

@@ -313,7 +313,7 @@ Images are sent to the RTX backend as base64 in the HTTP request, not as local f
 
 ## Project 3: Local CV ONNX / TensorRT Optimization
 
-Project 3 starts from the v0.5 local CV path and measures runtime choices for Jetson deployment. Phase 1 keeps the MobileNet-SSD Caffe OpenCV DNN model as the v0.5 baseline, then uses an ONNX Model Zoo SSD-MobileNetV1 model for ONNXRuntime and the TensorRT FP16 build path. This keeps the detector family close to the current baseline without relying on brittle Caffe-to-ONNX conversion.
+Project 3 starts from the v0.5 local CV path and measures runtime choices for Jetson deployment. MobileNet-SSD Caffe through OpenCV DNN remains the v0.5 router baseline. Phase 1 used SSD-MobileNetV1 ONNX for ONNXRuntime feasibility, Phase 1.5 fixed ONNXRuntime session lifecycle overhead, and Phase 2 switches the TensorRT optimization object to YOLOv8n because SSD-MobileNetV1 ONNX hits a TensorRT 10.3 graph compatibility blocker.
 
 Run the fixed-image runtime benchmarks on Jetson:
 
@@ -338,34 +338,45 @@ python3 serving/scripts/benchmark_local_cv_runtimes.py \
   --out serving/results/raw/local_cv_onnx_reuse_baseline.csv
 
 python3 serving/scripts/benchmark_local_cv_runtimes.py \
-  --runtime tensorrt_fp16 \
+  --runtime yolo_onnxruntime_cpu_reuse \
   --image results/figures/camera_v05_positive_detection.jpg \
   --iterations 30 \
-  --out serving/results/raw/local_cv_tensorrt_fp16.csv
+  --warmup 3 \
+  --out serving/results/raw/local_cv_yolo_onnx_reuse.csv
+
+env LD_LIBRARY_PATH=/usr/lib/aarch64-linux-gnu/nvidia:/usr/local/cuda/targets/aarch64-linux/lib \
+  python3 serving/scripts/benchmark_local_cv_runtimes.py \
+  --runtime yolo_tensorrt_fp16 \
+  --image results/figures/camera_v05_positive_detection.jpg \
+  --iterations 30 \
+  --warmup 3 \
+  --out serving/results/raw/local_cv_yolo_tensorrt_fp16.csv
 
 python3 serving/scripts/summarize_local_cv_runtimes.py \
   serving/results/raw/local_cv_runtime_baseline.csv \
   serving/results/raw/local_cv_onnx_baseline.csv \
   serving/results/raw/local_cv_onnx_reuse_baseline.csv \
-  serving/results/raw/local_cv_tensorrt_fp16.csv \
+  serving/results/raw/local_cv_yolo_onnx_reuse.csv \
+  serving/results/raw/local_cv_yolo_tensorrt_fp16.csv \
   --out serving/results/raw/local_cv_runtime_summary.csv
 ```
 
-Current Phase 1 summary:
+Current Project 3 summary:
 
 | Runtime | Runs | Success | Detection consistency | Mode labels | Avg inference ms | P95 ms | Avg total ms |
 |---|---:|---:|---:|---|---:|---:|---:|
 | OpenCV DNN | 30 | 30 | 1.0 | `["chair"]` | 90.71 | 95.87 | 127.83 |
 | ONNXRuntime CPU | 30 | 30 | 1.0 | `["bed", "chair"]` | 53.23 | 60.92 | 4929.98 |
 | ONNXRuntime CPU reuse | 30 | 30 | 1.0 | `["bed", "chair"]` | 42.02 | 41.67 | 49.04 |
-| TensorRT FP16 | 1 | 0 | 0.0 | n/a | n/a | n/a | n/a |
+| YOLO ONNXRuntime CPU reuse | 30 | 30 | 1.0 | `["bed"]` | 91.70 | 107.10 | 108.64 |
+| YOLO TensorRT FP16 | 30 | 30 | 1.0 | `["bed"]` | 14.54 | 14.71 | 28.98 |
 
 Phase 1.5 shows that the earlier ONNXRuntime total latency problem was session lifecycle overhead: reusable session initialization costs about `4907.15 ms` once, then per-request total latency drops from `4929.98 ms` to `49.04 ms`.
 
-TensorRT FP16 is currently blocked by missing Jetson TensorRT packages: `trtexec` is not installed. The Jetson apt source reports candidate `tensorrt 10.3.0.30-1+cuda12.5`; after installing it, run:
+TensorRT is now enabled on Jetson with `trtexec` at `/usr/src/tensorrt/bin/trtexec` and TensorRT `10.3.0`. Runtime commands need:
 
 ```bash
-serving/scripts/build_local_cv_trt_engine.sh
+export LD_LIBRARY_PATH=/usr/lib/aarch64-linux-gnu/nvidia:/usr/local/cuda/targets/aarch64-linux/lib:${LD_LIBRARY_PATH:-}
 ```
 
-INT8 calibration is deferred to Project 3 Phase 2.
+SSD-MobileNetV1 ONNX was tested with FP16, FP32, low optimization level, explicit shape, and explicit `uint8:hwc` input format, but all builds failed with `Device to shape host node should not be folded into myelin`. The engineering decision is to keep MobileNet-SSD as the router baseline and use YOLOv8n for the TensorRT benchmark. INT8 calibration is deferred to Project 3 Phase 3.

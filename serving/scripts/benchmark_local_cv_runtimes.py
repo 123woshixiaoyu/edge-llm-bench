@@ -14,6 +14,7 @@ if str(REPO_ROOT) not in sys.path:
 from serving.app.local_cv import run_mobilenet_ssd
 from serving.app.local_cv_onnx import OnnxLocalCVDetector, run_ssd_mobilenet_onnx
 from serving.app.local_cv_tensorrt import run_tensorrt_fp16
+from serving.app.local_cv_yolo import YoloOnnxDetector, YoloTensorRTDetector
 
 
 def detections_json(result) -> str:
@@ -37,6 +38,8 @@ def run_once(runtime: str, image_path: Path, args, detector=None):
         return detector.detect(image_path)
     if runtime == "tensorrt_fp16":
         return run_tensorrt_fp16(image_path, engine_path=args.trt_engine)
+    if runtime in ("yolo_onnxruntime_cpu_reuse", "yolo_tensorrt_fp16"):
+        return detector.detect(image_path)
     raise ValueError(f"unknown runtime: {runtime}")
 
 
@@ -44,7 +47,14 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Benchmark local CV runtimes on a fixed image.")
     parser.add_argument(
         "--runtime",
-        choices=["opencv_dnn", "onnxruntime", "onnxruntime_cpu_reuse", "tensorrt_fp16"],
+        choices=[
+            "opencv_dnn",
+            "onnxruntime",
+            "onnxruntime_cpu_reuse",
+            "tensorrt_fp16",
+            "yolo_onnxruntime_cpu_reuse",
+            "yolo_tensorrt_fp16",
+        ],
         required=True,
     )
     parser.add_argument("--image", type=Path, default=REPO_ROOT / "results/figures/camera_v05_positive_detection.jpg")
@@ -61,7 +71,18 @@ def main() -> int:
         type=Path,
         default=Path("/home/rainbow/models/vision/ssd_mobilenet_onnx/ssd_mobilenet_v1_10_fp16.engine"),
     )
+    parser.add_argument(
+        "--yolo-onnx-model",
+        type=Path,
+        default=Path("/home/rainbow/models/vision/yolo_nano/yolov8n.onnx"),
+    )
+    parser.add_argument(
+        "--yolo-trt-engine",
+        type=Path,
+        default=Path("/home/rainbow/models/vision/yolo_nano/yolov8n_fp16.engine"),
+    )
     parser.add_argument("--confidence-threshold", type=float, default=0.2)
+    parser.add_argument("--iou-threshold", type=float, default=0.45)
     parser.add_argument("--warmup", type=int, default=3)
     args = parser.parse_args()
 
@@ -75,6 +96,23 @@ def main() -> int:
             warmup=args.warmup,
         )
         session_init_latency_ms = detector.session_init_latency_ms
+    elif args.runtime == "yolo_onnxruntime_cpu_reuse":
+        detector = YoloOnnxDetector(
+            model_path=args.yolo_onnx_model,
+            confidence_threshold=args.confidence_threshold,
+            iou_threshold=args.iou_threshold,
+            providers=["CPUExecutionProvider"],
+            warmup=args.warmup,
+        )
+        session_init_latency_ms = detector.session_init_latency_ms
+    elif args.runtime == "yolo_tensorrt_fp16":
+        detector = YoloTensorRTDetector(
+            engine_path=args.yolo_trt_engine,
+            confidence_threshold=args.confidence_threshold,
+            iou_threshold=args.iou_threshold,
+            warmup=args.warmup,
+        )
+        session_init_latency_ms = detector.engine_init_latency_ms
 
     args.out.parent.mkdir(parents=True, exist_ok=True)
     fieldnames = [

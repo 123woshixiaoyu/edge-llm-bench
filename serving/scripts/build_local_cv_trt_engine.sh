@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-ONNX_MODEL="${1:-/home/rainbow/models/vision/ssd_mobilenet_onnx/ssd_mobilenet_v1_10.onnx}"
-ENGINE_PATH="${2:-/home/rainbow/models/vision/ssd_mobilenet_onnx/ssd_mobilenet_v1_10_fp16.engine}"
+ONNX_MODEL="${1:-/home/rainbow/models/vision/yolo_nano/yolov8n.onnx}"
+ENGINE_PATH="${2:-/home/rainbow/models/vision/yolo_nano/yolov8n_fp16.engine}"
 
 if command -v trtexec >/dev/null 2>&1; then
   TRTEXEC="$(command -v trtexec)"
@@ -16,10 +16,11 @@ fi
 
 mkdir -p "$(dirname "$ENGINE_PATH")"
 
+export LD_LIBRARY_PATH="/usr/lib/aarch64-linux-gnu/nvidia:/usr/local/cuda/targets/aarch64-linux/lib:${LD_LIBRARY_PATH:-}"
+
 "$TRTEXEC" \
   --onnx="$ONNX_MODEL" \
   --saveEngine="$ENGINE_PATH" \
   --fp16 \
-  --workspace=1024 \
-  --duration=10 \
-  --avgRuns=20
+  --memPoolSize=workspace:1024 \
+  --skipInference
