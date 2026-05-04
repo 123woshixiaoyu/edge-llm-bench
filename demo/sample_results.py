@@ -18,6 +18,7 @@ TEXT_SMOKE_CSV = REPO_ROOT / "serving" / "results" / "raw" / "dual_real_backend_
 VISION_SMOKE_CSV = REPO_ROOT / "serving" / "results" / "raw" / "vision_router_yolo_trt_smoke.csv"
 RELIABILITY_SUMMARY_CSV = REPO_ROOT / "serving" / "results" / "raw" / "reliability_summary.csv"
 LOCAL_CV_SUMMARY_CSV = REPO_ROOT / "serving" / "results" / "raw" / "local_cv_runtime_summary.csv"
+INTERACTIVE_SMOKE_CSV = REPO_ROOT / "serving" / "results" / "raw" / "interactive_gateway_smoke.csv"
 
 
 def read_csv(path: Path) -> list[dict[str, str]]:
@@ -41,6 +42,39 @@ def _first(rows: list[dict[str, str]], **filters: str) -> dict[str, str] | None:
         if all(row.get(key) == value for key, value in filters.items()):
             return row
     return None
+
+
+def _sample_preview_notice() -> str:
+    return "Sample mode only stores a preview. Use real backend mode to see the full response."
+
+
+def _labels_summary(labels: list[Any], detections: list[dict[str, Any]]) -> str:
+    label_text = ", ".join(str(label) for label in labels) if labels else "no labels"
+    if not detections:
+        return f"Detected labels: {label_text}."
+    top = detections[0]
+    return (
+        f"Detected labels: {label_text}. "
+        f"Top detection: {top.get('label', 'object')} "
+        f"confidence={top.get('confidence', 'n/a')} box={top.get('box', [])}."
+    )
+
+
+def _vision_final_answer(
+    *,
+    route: str,
+    labels: list[Any],
+    detections: list[dict[str, Any]],
+    reasons: list[Any],
+    remote_text: str = "",
+) -> tuple[str, str]:
+    if route == "local":
+        return "Jetson local CV", _labels_summary(labels, detections)
+    if route == "remote":
+        return "RTX remote VLM", remote_text or "Remote route sample stores routing evidence but no full VLM text."
+    if route == "reject":
+        return "policy reject", "; ".join(str(reason) for reason in reasons if reason)
+    return "unknown", ""
 
 
 def select_text_sample(
@@ -70,17 +104,23 @@ def select_text_sample(
             "backend_latency_ms": None,
             "total_latency_ms": 0,
             "response_preview": "No sample row is available for this request.",
+            "full_response": "No sample row is available for this request.",
+            "sample_truncated": True,
             "reasons": ["sample data unavailable"],
             "input_preview": prompt[:120],
         }
 
+    preview = row.get("short_response_preview", "")
     return {
         "mode": "sample",
         "route": row.get("route", ""),
         "selected_backend": row.get("selected_model", ""),
         "backend_latency_ms": row.get("backend_latency_ms") or None,
         "total_latency_ms": row.get("total_latency_ms") or None,
-        "response_preview": row.get("short_response_preview", ""),
+        "response_preview": preview,
+        "full_response": preview,
+        "sample_truncated": True,
+        "sample_truncation_note": _sample_preview_notice(),
         "reasons": [reason.strip() for reason in row.get("reasons", "").split(";") if reason.strip()],
         "input_preview": prompt[:120],
         "sample_request_id": row.get("request_id", ""),
@@ -128,6 +168,8 @@ def call_text_backend(
             "backend_latency_ms": data.get("backend_latency_ms"),
             "total_latency_ms": data.get("total_latency_ms", elapsed_ms),
             "response_preview": message[:500] or raw[:500],
+            "full_response": message or raw,
+            "sample_truncated": False,
             "reasons": decision.get("reasons", ["real backend response did not include route reasons"]),
             "input_preview": prompt[:120],
         }
@@ -142,6 +184,8 @@ def call_text_backend(
                 "backend_latency_ms": data.get("backend_latency_ms"),
                 "total_latency_ms": data.get("total_latency_ms"),
                 "response_preview": data.get("error", str(exc)),
+                "full_response": data.get("error", str(exc)),
+                "sample_truncated": False,
                 "reasons": decision.get("reasons", [data.get("error", str(exc))]),
                 "input_preview": prompt[:120],
             }
@@ -159,6 +203,7 @@ def call_text_backend(
 
 def select_vision_sample(task_type: str, privacy: str, quality: str) -> dict[str, Any]:
     rows = read_csv(VISION_SMOKE_CSV)
+    interactive_rows = read_csv(INTERACTIVE_SMOKE_CSV)
     row = _first(rows, task_type=task_type, privacy=privacy, quality=quality)
     if not row and quality == "high":
         row = _first(rows, task_type=task_type, quality="high")
@@ -172,24 +217,52 @@ def select_vision_sample(task_type: str, privacy: str, quality: str) -> dict[str
             "selected_backend": "",
             "detected_labels": [],
             "detections": [],
+            "local_cv_precheck_labels": [],
+            "local_cv_precheck_detections": [],
+            "final_answer_source": "policy reject",
+            "final_answer_text": "No sample row is available for this request.",
+            "full_response": "No sample row is available for this request.",
+            "sample_truncated": True,
             "reasons": ["sample data unavailable"],
         }
 
+    route = row.get("route", "")
+    labels = parse_jsonish(row.get("detected_labels"), [])
+    detections = parse_jsonish(row.get("detections"), [])
+    reasons = parse_jsonish(row.get("reasons"), [row.get("reasons", "")])
+    interactive = _first(interactive_rows, task_type=task_type, privacy=privacy, quality=quality, route=route)
+    remote_text = (interactive or {}).get("response_preview", "")
+    final_source, final_text = _vision_final_answer(
+        route=route,
+        labels=labels,
+        detections=detections,
+        reasons=reasons,
+        remote_text=remote_text,
+    )
     return {
         "mode": "sample",
-        "route": row.get("route", ""),
+        "route": route,
         "selected_backend": row.get("selected_model", ""),
         "remote_is_mock": row.get("remote_is_mock", ""),
         "local_cv_backend": row.get("local_cv_backend", ""),
         "local_cv_model": row.get("local_cv_model", ""),
-        "detected_labels": parse_jsonish(row.get("detected_labels"), []),
-        "detections": parse_jsonish(row.get("detections"), []),
+        "detected_labels": labels,
+        "detections": detections,
+        "local_cv_precheck_labels": labels,
+        "local_cv_precheck_detections": detections,
         "capture_latency_ms": row.get("capture_latency_ms") or None,
         "local_cv_inference_latency_ms": row.get("local_cv_inference_latency_ms") or None,
         "local_cv_total_latency_ms": row.get("local_cv_total_latency_ms") or None,
         "remote_latency_ms": row.get("remote_latency_ms") or None,
         "total_latency_ms": row.get("total_latency_ms") or None,
-        "reasons": parse_jsonish(row.get("reasons"), [row.get("reasons", "")]),
+        "remote_response_preview": remote_text,
+        "remote_response_text": remote_text,
+        "final_answer_source": final_source,
+        "final_answer_text": final_text,
+        "full_response": final_text,
+        "sample_truncated": True,
+        "sample_truncation_note": _sample_preview_notice(),
+        "reasons": reasons,
         "sample_request_id": row.get("request_id", ""),
         "sample_source": str(VISION_SMOKE_CSV.relative_to(REPO_ROOT)),
     }
@@ -253,6 +326,24 @@ def call_vision_backend(
         data["mode"] = "real"
         data["elapsed_ms"] = round((time.perf_counter() - start) * 1000, 2)
         data["selected_backend"] = data.get("selected_backend") or ""
+        labels = data.get("detected_labels") or []
+        detections = data.get("detections") or []
+        route = data.get("route", "")
+        remote_text = data.get("remote_response_text") or ""
+        final_source, final_text = _vision_final_answer(
+            route=route,
+            labels=labels,
+            detections=detections,
+            reasons=data.get("reasons") or [],
+            remote_text=remote_text,
+        )
+        data["local_cv_precheck_labels"] = labels
+        data["local_cv_precheck_detections"] = detections
+        data["remote_response_preview"] = remote_text[:500]
+        data["final_answer_source"] = final_source
+        data["final_answer_text"] = final_text
+        data["full_response"] = remote_text or final_text
+        data["sample_truncated"] = False
         return data
     except urllib.error.HTTPError as exc:
         try:
@@ -260,6 +351,21 @@ def call_vision_backend(
             data["mode"] = "real"
             data["elapsed_ms"] = round((time.perf_counter() - start) * 1000, 2)
             data["selected_backend"] = data.get("selected_backend") or ""
+            labels = data.get("detected_labels") or []
+            detections = data.get("detections") or []
+            final_source, final_text = _vision_final_answer(
+                route=data.get("route", "reject"),
+                labels=labels,
+                detections=detections,
+                reasons=data.get("reasons") or [data.get("error", str(exc))],
+                remote_text=data.get("remote_response_text") or "",
+            )
+            data["local_cv_precheck_labels"] = labels
+            data["local_cv_precheck_detections"] = detections
+            data["final_answer_source"] = final_source
+            data["final_answer_text"] = final_text
+            data["full_response"] = data.get("remote_response_text") or final_text
+            data["sample_truncated"] = False
             return data
         except Exception:
             sample = select_vision_sample(task_type, privacy, quality)

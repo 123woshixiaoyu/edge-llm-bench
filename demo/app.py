@@ -79,6 +79,15 @@ def render_text_panel(use_sample_mode: bool, api_base_url: str) -> None:
             }
         )
         st.text_area("Response preview", value=result.get("response_preview", ""), height=160)
+        if result.get("sample_truncated"):
+            st.warning(result.get("sample_truncation_note") or "Sample mode only stores a preview.")
+        with st.expander("Full response", expanded=not result.get("sample_truncated")):
+            st.text_area(
+                "Full model response",
+                value=result.get("full_response") or result.get("response_preview", ""),
+                height=260,
+                label_visibility="collapsed",
+            )
 
 
 def render_vision_panel(use_sample_mode: bool, api_base_url: str) -> None:
@@ -124,36 +133,93 @@ def render_vision_panel(use_sample_mode: bool, api_base_url: str) -> None:
                 image_for_boxes = BytesIO(base64.b64decode(result["image_base64"]))
             except Exception:
                 image_for_boxes = str(SAMPLE_IMAGE)
-        annotated = draw_detections(image_for_boxes, result.get("detections", []))
-        preview_col, decision_col = st.columns([1, 1])
+        precheck_detections = result.get("local_cv_precheck_detections") or result.get("detections", [])
+        precheck_labels = result.get("local_cv_precheck_labels") or result.get("detected_labels", [])
+        annotated = draw_detections(image_for_boxes, precheck_detections)
+
+        st.markdown("### Local CV Precheck (Jetson)")
+        st.caption(
+            "This local detection runs before routing and provides fast edge-side visual evidence. "
+            "For remote semantic tasks, the final answer comes from the remote VLM, not from these boxes."
+        )
+        preview_col, cv_col = st.columns([1, 1])
         with preview_col:
             if annotated is not None:
-                st.image(annotated, caption="Image preview with detections", use_container_width=True)
+                caption = (
+                    "Camera frame with local YOLO precheck boxes"
+                    if image_source == "Jetson camera"
+                    else "Uploaded image with local CV precheck boxes"
+                )
+                if use_sample_mode and image_source == "sample image":
+                    caption = "Sample image with local CV precheck boxes"
+                st.image(annotated, caption=caption, use_container_width=True)
             else:
                 st.warning("Sample image not available.")
-        with decision_col:
-            st.metric("Route", result.get("route", "unknown"))
-            st.metric("Selected backend", result.get("selected_backend") or "none")
+        with cv_col:
             st.metric("Local CV inference ms", result.get("local_cv_inference_latency_ms") or "n/a")
             st.json(
                 {
-                    "mode": result.get("mode"),
-                    "remote_is_mock": result.get("remote_is_mock"),
                     "local_cv_backend": result.get("local_cv_backend"),
                     "local_cv_model": result.get("local_cv_model"),
+                    "detected_labels": precheck_labels,
+                    "detections": precheck_detections,
                     "capture_latency_ms": result.get("capture_latency_ms"),
+                    "local_cv_inference_latency_ms": result.get("local_cv_inference_latency_ms"),
                     "local_cv_total_latency_ms": result.get("local_cv_total_latency_ms"),
-                    "remote_latency_ms": result.get("remote_latency_ms"),
-                    "total_latency_ms": result.get("total_latency_ms"),
-                    "status": result.get("status"),
-                    "error": result.get("error"),
-                    "detected_labels": result.get("detected_labels"),
-                    "detections": result.get("detections"),
-                    "reasons": result.get("reasons"),
                 }
             )
-            if result.get("remote_response_text"):
-                st.text_area("Remote VLM response preview", value=result.get("remote_response_text", "")[:800], height=160)
+
+        st.markdown("### Routing Decision")
+        route_col, backend_col, latency_col = st.columns(3)
+        route_col.metric("Route", result.get("route", "unknown"))
+        backend_col.metric("Selected backend", result.get("selected_backend") or "none")
+        latency_col.metric("Total latency ms", result.get("total_latency_ms") or "n/a")
+        st.json(
+            {
+                "mode": result.get("mode"),
+                "privacy": privacy,
+                "quality": quality,
+                "remote_is_mock": result.get("remote_is_mock"),
+                "remote_latency_ms": result.get("remote_latency_ms"),
+                "status": result.get("status"),
+                "error": result.get("error"),
+                "reasons": result.get("reasons"),
+            }
+        )
+
+        st.markdown("### Final Routed Answer")
+        final_source = result.get("final_answer_source") or "unknown"
+        st.write(f"**Final answer source:** {final_source}")
+        route = result.get("route")
+        if route == "local":
+            st.info("Local CV detection/classification is the final answer for this task.")
+            st.json(
+                {
+                    "detected_labels": precheck_labels,
+                    "detections": precheck_detections,
+                }
+            )
+        elif route == "remote":
+            st.info("The final semantic answer comes from the RTX remote VLM. YOLO boxes above are only local pre-analysis.")
+            st.text_area(
+                "Remote VLM response",
+                value=result.get("final_answer_text") or result.get("remote_response_text", ""),
+                height=180,
+            )
+            if result.get("sample_truncated"):
+                st.warning(result.get("sample_truncation_note") or "Sample mode only stores a preview.")
+            with st.expander("Full remote VLM response", expanded=not result.get("sample_truncated")):
+                st.text_area(
+                    "Full remote VLM response text",
+                    value=result.get("full_response") or result.get("final_answer_text", ""),
+                    height=280,
+                    label_visibility="collapsed",
+                )
+        elif route == "reject":
+            st.warning("Policy rejected this request. No model answer was produced.")
+            st.json({"reject_reasons": result.get("reasons", [])})
+        else:
+            st.write(result.get("final_answer_text") or "")
 
 
 def render_backend_panel(use_sample_mode: bool, api_base_url: str) -> None:

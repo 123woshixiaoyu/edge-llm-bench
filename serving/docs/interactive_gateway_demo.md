@@ -45,6 +45,13 @@ Response fields include:
 - `remote_is_mock`
 - error/status fields
 
+The UI intentionally separates local CV precheck evidence from the final routed answer:
+
+- YOLO boxes and labels are produced by Jetson local CV.
+- For local `detect` / `classify`, local CV is the final answer.
+- For remote `scene_description` / `vqa`, local CV remains pre-analysis/logging, and the final answer comes from the RTX remote VLM.
+- For reject routes, the final answer source is the routing policy.
+
 ## Runtime Configuration
 
 Use the v0.9 config directory on Jetson:
@@ -75,6 +82,8 @@ Modes:
 
 - Sample mode: reads committed CSV/image evidence. It does not require Jetson, RTX, model files, or TensorRT engines.
 - Real backend mode: calls the configured Jetson Gateway. Backend failures are shown as friendly errors or sample fallback in the UI.
+
+Sample mode may only show stored previews because CSV evidence intentionally avoids storing long generations. Real backend mode displays full model responses when the API returns them.
 
 Vision real mode is single-frame interaction. It is not a video stream and does not attempt continuous camera/VLM processing.
 

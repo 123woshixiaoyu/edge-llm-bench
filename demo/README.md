@@ -14,20 +14,33 @@ streamlit run demo/app.py
 
 ## Modes
 
-- **Sample mode**: default. Reads existing result files and the sample camera frame. No Jetson, RTX, model files, or TensorRT engine is required.
-- **Real backend mode**: optional. Text requests call `/v1/chat/completions`; vision requests call `/v1/vision/analyze`. If the backend is unavailable, the UI shows a friendly error or sample fallback instead of crashing.
+- **Sample mode**: default. Reads existing result files and the sample camera frame. No Jetson, RTX, model files, or TensorRT engine is required. Some sample rows only store response previews.
+- **Real backend mode**: optional. Text requests call `/v1/chat/completions`; vision requests call `/v1/vision/analyze`. If the backend is unavailable, the UI shows a friendly error or sample fallback instead of crashing. Real mode shows full model responses when the API returns them.
 
 ## What It Shows
 
 - Text task routing across Jetson local LLM, RTX remote LLM, and reject paths.
 - Vision task routing across YOLOv8n TensorRT local CV, real remote VLM when available, and privacy rejects.
+- A clear split between **Local CV Precheck**, **Routing Decision**, and **Final Routed Answer**.
 - Backend status for the selected local/remote LLM/CV/VLM roles.
 - Key result snapshots for quantization, ONNXRuntime session reuse, YOLO TensorRT FP16, and v0.7 reliability.
+
+## Vision Answer Sources
+
+Vision requests can run a cheap Jetson local CV precheck even when the final route is remote.
+
+- Local YOLO boxes and labels come from Jetson local YOLO TensorRT.
+- For `detect` / `classify` local routes, those labels/boxes are the final answer.
+- For `scene_description` / `vqa` remote routes, the final semantic answer comes from the RTX remote VLM.
+- For privacy rejects, no model answer is produced; the UI shows policy reasons.
+
+This separates cheap local perception from expensive semantic reasoning.
 
 ## Current Limits
 
 - This is a dashboard, not a production serving layer.
 - Sample mode is evidence playback, not live inference.
+- Sample mode may only show stored previews; use real backend mode for full responses.
 - Real vision mode is single-frame interaction, not video streaming.
 - Remote VLM routes are real when the RTX VLM service/tunnel is running, but they can take 15-20 seconds.
 - No login, database, cloud deploy, video stream, model download, or new benchmark is included.
