@@ -132,6 +132,7 @@ Main entry points:
 - YOLO TensorRT router smoke: `python3 serving/scripts/smoke_vision_router_yolo_trt.py`
 - Reliability benchmark: `python3 serving/scripts/reliability_benchmark.py --mode vision --concurrency 1,2,4,8 --requests 20`
 - Demo dashboard: `streamlit run demo/app.py`
+- Setup notes: [docs/setup_requirements.md](docs/setup_requirements.md)
 
 Runtime assets are intentionally outside git:
 
@@ -141,10 +142,16 @@ Runtime assets are intentionally outside git:
 - TensorRT engines
 - calibration images/caches
 
+## Sharing Note
+
+If this repository stays private, public viewers will see a GitHub `404`. Before using a GitHub link in a resume or application, either make the repo public, add the reviewer as a collaborator, or share an exported README/report/demo artifact. See [docs/submission_checklist.md](docs/submission_checklist.md).
+
 ## Documentation Map
 
 - [docs/model_selection_scorecard.md](docs/model_selection_scorecard.md)
 - [docs/quantization_decision_study.md](docs/quantization_decision_study.md)
+- [docs/setup_requirements.md](docs/setup_requirements.md)
+- [docs/submission_checklist.md](docs/submission_checklist.md)
 - [serving/docs/vision_routing_design.md](serving/docs/vision_routing_design.md)
 - [serving/docs/project3_tensorrt_report.md](serving/docs/project3_tensorrt_report.md)
 - [serving/docs/cpp_tensorrt_adapter.md](serving/docs/cpp_tensorrt_adapter.md)

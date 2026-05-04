@@ -213,6 +213,7 @@ Current v0.5b result:
 - remote model: `gemma4_e2b_it_q4_mmproj`
 - remote VLM rows: `remote_is_mock=false`
 - remote VLM latency: about `19.2-20.0 s` per remote request
+- corrected end-to-end router total for remote rows: about `20.8-21.7 s`, including capture and local CV, without double-counting remote latency
 
 The remote response is real VLM output, but the current simple `llama-mtmd-cli` subprocess wrapper loads the model for each request and the model can produce reasoning-style prose. That is acceptable for v0.5b because this stage validates the real camera -> router -> remote VLM loop, not final prompt style or serving latency.
 

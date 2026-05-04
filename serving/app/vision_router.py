@@ -156,10 +156,10 @@ class VisionRouter:
         match_expected = None
         if request.expected_route is not None:
             match_expected = decision.route == request.expected_route
-        total_latency_ms = (time.perf_counter() - start) * 1000
+        route_wall_latency_ms = (time.perf_counter() - start) * 1000
         capture_latency = capture.capture_latency_ms or 0.0
         cv_latency = local_cv.total_latency_ms or local_cv.inference_latency_ms or 0.0
-        total_latency_ms += capture_latency + cv_latency + (remote_latency_ms or 0.0)
+        total_latency_ms = capture_latency + cv_latency + route_wall_latency_ms
         return VisionResult(
             request_id=request_id,
             request=request,
