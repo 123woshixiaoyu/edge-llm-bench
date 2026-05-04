@@ -1,0 +1,22 @@
+# v0.9 config: real Jetson gateway with local LLM/CV and RTX remote LLM/VLM.
+backend_mode: llamacpp
+local_llama_base_url: http://127.0.0.1:8080
+# Jetson reaches RTX/WSL remote llama-server through the existing tunnel:
+#   Jetson 127.0.0.1:18081 -> RTX/WSL 127.0.0.1:8081
+remote_llama_base_url: http://127.0.0.1:18081
+
+max_local_prompt_tokens: 512
+max_total_prompt_tokens: 4096
+local_queue_limit: 2
+max_jetson_temp_c: 75
+low_latency_budget_ms: 5000
+too_low_complex_latency_ms: 1500
+
+vision_policy:
+  local_cv_backend: yolo_tensorrt_fp16
+  local_cv_engine_path: /home/rainbow/models/vision/yolo_nano/yolov8n_fp16.engine
+  fallback_to_mobilenet: false
+  fallback_model_dir: /home/rainbow/models/vision/mobilenet_ssd
+  remote_vlm_base_url: http://127.0.0.1:18091
+  remote_vlm_timeout_s: 240
+  max_local_latency_budget_ms: 3000

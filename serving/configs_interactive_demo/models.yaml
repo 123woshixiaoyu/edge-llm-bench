@@ -1,0 +1,27 @@
+local:
+  default: qwen35_08b_q4
+  quality: qwen35_4b_q4
+  medium_candidate: gemma4_e2b_q4
+
+remote:
+  default: qwen35_4b_q4
+  high_quality: qwen35_4b_q4
+
+local_cv:
+  default_backend: yolo_tensorrt_fp16
+  fallback_backend: mobilenet_ssd_opencv_dnn
+  yolo_tensorrt_fp16:
+    model: yolov8n
+    runtime: TensorRT FP16
+    engine_path: /home/rainbow/models/vision/yolo_nano/yolov8n_fp16.engine
+    model_dir: /home/rainbow/models/vision/yolo_nano
+  mobilenet_ssd_opencv_dnn:
+    model: MobileNet-SSD
+    runtime: OpenCV DNN
+    model_dir: /home/rainbow/models/vision/mobilenet_ssd
+
+remote_vlm:
+  default_backend: gemma4_e2b_it_q4_mmproj
+  gemma4_e2b_it_q4_mmproj:
+    runtime: llama.cpp mtmd HTTP wrapper
+    remote_url: http://127.0.0.1:18091

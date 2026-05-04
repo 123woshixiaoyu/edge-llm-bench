@@ -145,7 +145,7 @@ class VisionRouter:
                     prompt=prompt,
                     max_tokens=request.max_tokens,
                 )
-                remote_latency_ms = remote_result.latency_ms
+                remote_latency_ms = remote_result.network_roundtrip_ms or remote_result.latency_ms
                 remote_model = remote_result.model
                 remote_response_text = remote_result.text
                 decision.remote_is_mock = False

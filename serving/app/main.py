@@ -9,13 +9,23 @@ from fastapi.responses import JSONResponse
 
 from .policy import load_router_config
 from .router import TaskRouterService
-from .schemas import ChatChoice, ChatCompletionResponse, ChatRequest, Message, RouteResponse, RouterStateUpdate
+from .schemas import (
+    ChatChoice,
+    ChatCompletionResponse,
+    ChatRequest,
+    Message,
+    RouteResponse,
+    RouterStateUpdate,
+    VisionAnalyzeRequest,
+)
+from .vision_api import analyze_vision_request, build_vision_router
 
 
 SERVING_ROOT = Path(__file__).resolve().parents[1]
 CONFIG_DIR = Path(os.environ.get("EDGE_ROUTER_CONFIG_DIR", SERVING_ROOT / "configs"))
 
 router_service = TaskRouterService(load_router_config(CONFIG_DIR), SERVING_ROOT)
+vision_router = build_vision_router(CONFIG_DIR)
 
 app = FastAPI(
     title="Edge LLM Task Router",
@@ -27,11 +37,17 @@ app = FastAPI(
 @app.get("/health")
 def health() -> dict:
     state = router_service.current_state()
+    vision_remote_available = (
+        vision_router.remote_backend.available() if vision_router.remote_backend is not None else True
+    )
     return {
         "status": "ok",
         "backend_mode": router_service.config.backend_mode,
         "local_backend_available": state.local_available,
         "remote_backend_available": state.remote_available,
+        "vision_local_cv_backend": vision_router.local_cv_backend,
+        "vision_remote_vlm_available": vision_remote_available,
+        "vision_remote_is_mock": vision_router.remote_backend is None,
         "local_queue_depth": state.local_queue_depth,
         "remote_queue_depth": state.remote_queue_depth,
         "jetson_temp_c": state.jetson_temp_c,
@@ -162,3 +178,13 @@ def chat_completions(request: ChatRequest):
         total_latency_ms=round(total_latency_ms, 2),
     )
     return response
+
+
+@app.post("/v1/vision/analyze")
+def vision_analyze(request: VisionAnalyzeRequest):
+    response, status_code = analyze_vision_request(
+        request=request,
+        router=vision_router,
+        serving_root=SERVING_ROOT,
+    )
+    return JSONResponse(status_code=status_code, content=response.model_dump())

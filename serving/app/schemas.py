@@ -10,6 +10,8 @@ Quality = Literal["low", "medium", "high"]
 Privacy = Literal["local_only", "allow_remote"]
 Route = Literal["local", "remote", "reject"]
 Risk = Literal["low", "medium", "high"]
+VisionTaskType = Literal["detect", "classify", "vqa", "scene_description"]
+VisionImageSource = Literal["camera", "upload", "sample"]
 
 
 class Message(BaseModel):
@@ -91,3 +93,41 @@ class ChatCompletionResponse(BaseModel):
     usage: dict[str, Any]
     backend_latency_ms: float
     total_latency_ms: float
+
+
+class VisionAnalyzeRequest(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
+    task_type: VisionTaskType
+    privacy: Privacy = "allow_remote"
+    quality: Quality = "medium"
+    latency_budget_ms: int = 3000
+    prompt: str | None = None
+    image_source: VisionImageSource = "camera"
+    image_base64: str | None = None
+    use_yolo_trt: bool = True
+    max_tokens: int = 128
+    request_id: str | None = None
+
+
+class VisionAnalyzeResponse(BaseModel):
+    request_id: str
+    route: Route
+    selected_backend: str | None
+    local_cv_backend: str | None
+    local_cv_model: str | None
+    remote_model: str | None
+    remote_is_mock: bool
+    capture_metadata: dict[str, Any]
+    detected_labels: list[str]
+    detections: list[dict[str, Any]]
+    remote_response_text: str
+    image_base64: str | None = None
+    capture_latency_ms: float | None
+    local_cv_inference_latency_ms: float | None
+    local_cv_total_latency_ms: float | None
+    remote_latency_ms: float | None
+    total_latency_ms: float
+    reasons: list[str]
+    error: str = ""
+    status: str = "success"

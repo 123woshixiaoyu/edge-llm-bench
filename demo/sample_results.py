@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import csv
+import base64
 import json
 import time
 import urllib.error
@@ -102,6 +103,7 @@ def call_text_backend(
         "quality": quality,
         "latency_budget_ms": latency_budget_ms,
         "stream": False,
+        "max_tokens": 128,
     }
     start = time.perf_counter()
     try:
@@ -118,16 +120,36 @@ def call_text_backend(
         message = ""
         if data.get("choices"):
             message = data["choices"][0].get("message", {}).get("content", "")
+        decision = data.get("route_decision") or {}
         return {
             "mode": "real",
-            "route": data.get("route", "unknown"),
-            "selected_backend": data.get("selected_model") or data.get("model", ""),
+            "route": decision.get("route", "unknown"),
+            "selected_backend": decision.get("selected_model") or data.get("model", ""),
             "backend_latency_ms": data.get("backend_latency_ms"),
             "total_latency_ms": data.get("total_latency_ms", elapsed_ms),
             "response_preview": message[:500] or raw[:500],
-            "reasons": data.get("reasons", ["real backend response did not include route reasons"]),
+            "reasons": decision.get("reasons", ["real backend response did not include route reasons"]),
             "input_preview": prompt[:120],
         }
+    except urllib.error.HTTPError as exc:
+        try:
+            data = json.loads(exc.read().decode("utf-8"))
+            decision = data.get("decision") or {}
+            return {
+                "mode": "real",
+                "route": decision.get("route", "reject"),
+                "selected_backend": decision.get("selected_model") or "",
+                "backend_latency_ms": data.get("backend_latency_ms"),
+                "total_latency_ms": data.get("total_latency_ms"),
+                "response_preview": data.get("error", str(exc)),
+                "reasons": decision.get("reasons", [data.get("error", str(exc))]),
+                "input_preview": prompt[:120],
+            }
+        except Exception:
+            sample = select_text_sample(prompt, task_type, privacy, quality, latency_budget_ms)
+            sample["mode"] = "sample fallback"
+            sample["reasons"] = [f"real backend returned HTTP {exc.code}", *sample["reasons"]]
+            return sample
     except (urllib.error.URLError, TimeoutError, json.JSONDecodeError) as exc:
         sample = select_text_sample(prompt, task_type, privacy, quality, latency_budget_ms)
         sample["mode"] = "sample fallback"
@@ -171,6 +193,84 @@ def select_vision_sample(task_type: str, privacy: str, quality: str) -> dict[str
         "sample_request_id": row.get("request_id", ""),
         "sample_source": str(VISION_SMOKE_CSV.relative_to(REPO_ROOT)),
     }
+
+
+def _encode_image_file(image_path: Any) -> str | None:
+    try:
+        if hasattr(image_path, "getvalue"):
+            return base64.b64encode(image_path.getvalue()).decode("ascii")
+        path = Path(image_path)
+        if path.exists():
+            return base64.b64encode(path.read_bytes()).decode("ascii")
+    except Exception:
+        return None
+    return None
+
+
+def call_vision_backend(
+    api_base_url: str,
+    *,
+    image_source: str,
+    image_path: Any,
+    task_type: str,
+    privacy: str,
+    quality: str,
+    latency_budget_ms: int,
+    prompt: str,
+    timeout_s: float = 260.0,
+) -> dict[str, Any]:
+    payload: dict[str, Any] = {
+        "task_type": task_type,
+        "privacy": privacy,
+        "quality": quality,
+        "latency_budget_ms": latency_budget_ms,
+        "prompt": prompt or None,
+        "image_source": "camera" if image_source == "camera" else "upload",
+        "use_yolo_trt": True,
+        "max_tokens": 96,
+    }
+    if image_source != "camera":
+        image_b64 = _encode_image_file(image_path)
+        if image_b64:
+            payload["image_base64"] = image_b64
+        else:
+            sample = select_vision_sample(task_type, privacy, quality)
+            sample["mode"] = "sample fallback"
+            sample["reasons"] = ["failed to encode selected image", *sample.get("reasons", [])]
+            return sample
+
+    start = time.perf_counter()
+    try:
+        request = urllib.request.Request(
+            f"{api_base_url.rstrip('/')}/v1/vision/analyze",
+            data=json.dumps(payload).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with urllib.request.urlopen(request, timeout=timeout_s) as response:
+            raw = response.read().decode("utf-8")
+        data = json.loads(raw)
+        data["mode"] = "real"
+        data["elapsed_ms"] = round((time.perf_counter() - start) * 1000, 2)
+        data["selected_backend"] = data.get("selected_backend") or ""
+        return data
+    except urllib.error.HTTPError as exc:
+        try:
+            data = json.loads(exc.read().decode("utf-8"))
+            data["mode"] = "real"
+            data["elapsed_ms"] = round((time.perf_counter() - start) * 1000, 2)
+            data["selected_backend"] = data.get("selected_backend") or ""
+            return data
+        except Exception:
+            sample = select_vision_sample(task_type, privacy, quality)
+            sample["mode"] = "sample fallback"
+            sample["reasons"] = [f"real vision backend returned HTTP {exc.code}", *sample.get("reasons", [])]
+            return sample
+    except (urllib.error.URLError, TimeoutError, json.JSONDecodeError) as exc:
+        sample = select_vision_sample(task_type, privacy, quality)
+        sample["mode"] = "sample fallback"
+        sample["reasons"] = [f"real vision backend unavailable: {exc}", *sample.get("reasons", [])]
+        return sample
 
 
 def draw_detections(image_path: Any, detections: list[dict[str, Any]]) -> Image.Image | None:

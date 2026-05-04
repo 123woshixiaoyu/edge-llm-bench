@@ -11,7 +11,7 @@ This project is a Jetson-first edge AI inference gateway, not a single-model dem
 - **Project 2 v0.5:** camera-aware router with CSI camera, local CV, and remote VLM.
 - **Project 3:** local CV runtime optimization with ONNXRuntime, TensorRT FP16, INT8 calibration, and a C++ worker benchmark.
 - **v0.6/v0.7:** optimized YOLO TensorRT backend integrated into the vision router, then checked with a small reliability benchmark.
-- **Demo dashboard:** lightweight Streamlit sample-mode UI for reviewer walkthroughs.
+- **v0.9 interactive demo:** lightweight Streamlit UI with sample playback and optional real Jetson Gateway calls.
 - **Remote VLM profiling:** latency breakdown and low-risk resize/prompt defaults for the Gemma VLM path.
 
 Model responsibilities are intentionally separated:
@@ -89,6 +89,7 @@ Source: [serving/docs/project3_tensorrt_report.md](serving/docs/project3_tensorr
 | v0.6 YOLO TensorRT router | Optimized local CV backend is used by router | 10/10 routes, `fallback_used=false` |
 | v0.7 reliability benchmark | Queue/fallback/reject/timeout behavior is explainable | 80 benchmark requests, pass rate 1.0 at concurrency 1/2/4/8; 9/9 failure modes |
 | v0.8 remote VLM profiling | Gemma VLM subprocess latency is measured and reduced with resize/prompt defaults | About 19.0 s baseline to about 16.7-17.2 s recommended config |
+| v0.9 interactive gateway demo | Browser UI calls the Jetson Gateway for text and single-frame vision tasks | `/v1/chat/completions` + `/v1/vision/analyze`; sample fallback remains available |
 
 Source: [serving/docs/reliability_report.md](serving/docs/reliability_report.md)
 
@@ -119,6 +120,7 @@ Artifacts:
 3. **Camera-aware router:** Jetson captures CSI frames, handles simple local CV, and routes semantic vision to a remote VLM when privacy allows.
 4. **Local CV optimization:** MobileNet-SSD proves the integration path; YOLOv8n TensorRT becomes the optimized local CV backend.
 5. **Reliability benchmark:** v0.7 checks queue pressure, fallback, reject, backend unavailable, privacy, and timeout behavior.
+6. **Interactive demo:** v0.9 exposes the real gateway through a thin dashboard without bypassing the router.
 
 ## How To Reproduce Main Demos
 
@@ -132,6 +134,8 @@ Main entry points:
 - YOLO TensorRT router smoke: `python3 serving/scripts/smoke_vision_router_yolo_trt.py`
 - Reliability benchmark: `python3 serving/scripts/reliability_benchmark.py --mode vision --concurrency 1,2,4,8 --requests 20`
 - Demo dashboard: `streamlit run demo/app.py`
+- Interactive gateway smoke: `python3 serving/scripts/smoke_interactive_gateway.py --url http://127.0.0.1:8000`
+- Interactive demo notes: [serving/docs/interactive_gateway_demo.md](serving/docs/interactive_gateway_demo.md)
 - Setup notes: [docs/setup_requirements.md](docs/setup_requirements.md)
 
 Runtime assets are intentionally outside git:
@@ -156,6 +160,7 @@ If this repository stays private, public viewers will see a GitHub `404`. Before
 - [serving/docs/project3_tensorrt_report.md](serving/docs/project3_tensorrt_report.md)
 - [serving/docs/cpp_tensorrt_adapter.md](serving/docs/cpp_tensorrt_adapter.md)
 - [serving/docs/remote_vlm_latency_optimization.md](serving/docs/remote_vlm_latency_optimization.md)
+- [serving/docs/interactive_gateway_demo.md](serving/docs/interactive_gateway_demo.md)
 - [serving/docs/reliability_report.md](serving/docs/reliability_report.md)
 - [serving/docs/serving_design.md](serving/docs/serving_design.md)
 - [serving/docs/routing_policy.md](serving/docs/routing_policy.md)
@@ -174,4 +179,4 @@ If this repository stays private, public viewers will see a GitHub `404`. Before
 ## Next Steps
 
 - Persistent remote VLM serving to replace subprocess CLI mode.
-- Optional dashboard real-backend wiring for the vision path.
+- Optional UI polish and recorded walkthrough for reviewer submissions.

@@ -1,11 +1,15 @@
 from __future__ import annotations
 
+import base64
+from io import BytesIO
+
 import streamlit as st
 
 from sample_results import (
     SAMPLE_IMAGE,
     backend_status,
     call_text_backend,
+    call_vision_backend,
     draw_detections,
     key_result_tables,
     real_backend_health,
@@ -77,32 +81,54 @@ def render_text_panel(use_sample_mode: bool, api_base_url: str) -> None:
         st.text_area("Response preview", value=result.get("response_preview", ""), height=160)
 
 
-def render_vision_panel(use_sample_mode: bool) -> None:
+def render_vision_panel(use_sample_mode: bool, api_base_url: str) -> None:
     st.subheader("Vision Task Router")
     left, right = st.columns([2, 1])
     with left:
-        image_file = st.file_uploader("Upload image, or leave empty to use the sample camera frame", type=["jpg", "jpeg", "png"])
+        image_source = st.selectbox(
+            "Image source",
+            ["sample image", "upload image", "Jetson camera"],
+            index=0 if use_sample_mode else 2,
+        )
+        image_file = None
+        if image_source == "upload image":
+            image_file = st.file_uploader("Upload image", type=["jpg", "jpeg", "png"])
         image_path = image_file if image_file is not None else str(SAMPLE_IMAGE)
     with right:
         task_type = st.selectbox("Vision task type", ["detect", "classify", "scene_description", "vqa"], index=0)
         privacy = st.selectbox("Vision privacy", ["allow_remote", "local_only"], index=0)
         quality = st.selectbox("Vision quality", ["low", "medium", "high"], index=0)
+        latency_budget_ms = st.number_input("Vision latency budget ms", min_value=100, max_value=60000, value=3000, step=100)
+        prompt = st.text_area("Optional vision prompt", value="", height=92)
 
     if st.button("Route Vision Task", type="primary"):
-        result = select_vision_sample(task_type, privacy, quality)
-        if not use_sample_mode:
-            result["mode"] = "sample fallback"
-            result["reasons"] = [
-                "real vision API is not invoked by this lightweight dashboard",
-                *result.get("reasons", []),
-            ]
+        if use_sample_mode:
+            result = select_vision_sample(task_type, privacy, quality)
+        else:
+            backend_source = "camera" if image_source == "Jetson camera" else "upload"
+            with st.spinner("Calling Jetson Gateway. Remote VLM routes can take 15-20 seconds."):
+                result = call_vision_backend(
+                    api_base_url,
+                    image_source=backend_source,
+                    image_path=image_path,
+                    task_type=task_type,
+                    privacy=privacy,
+                    quality=quality,
+                    latency_budget_ms=int(latency_budget_ms),
+                    prompt=prompt,
+                )
 
         image_for_boxes = str(SAMPLE_IMAGE) if image_file is None else image_file
+        if result.get("image_base64"):
+            try:
+                image_for_boxes = BytesIO(base64.b64decode(result["image_base64"]))
+            except Exception:
+                image_for_boxes = str(SAMPLE_IMAGE)
         annotated = draw_detections(image_for_boxes, result.get("detections", []))
         preview_col, decision_col = st.columns([1, 1])
         with preview_col:
             if annotated is not None:
-                st.image(annotated, caption="Image preview with sample detections", use_column_width=True)
+                st.image(annotated, caption="Image preview with detections", use_container_width=True)
             else:
                 st.warning("Sample image not available.")
         with decision_col:
@@ -119,11 +145,15 @@ def render_vision_panel(use_sample_mode: bool) -> None:
                     "local_cv_total_latency_ms": result.get("local_cv_total_latency_ms"),
                     "remote_latency_ms": result.get("remote_latency_ms"),
                     "total_latency_ms": result.get("total_latency_ms"),
+                    "status": result.get("status"),
+                    "error": result.get("error"),
                     "detected_labels": result.get("detected_labels"),
                     "detections": result.get("detections"),
                     "reasons": result.get("reasons"),
                 }
             )
+            if result.get("remote_response_text"):
+                st.text_area("Remote VLM response preview", value=result.get("remote_response_text", "")[:800], height=160)
 
 
 def render_backend_panel(use_sample_mode: bool, api_base_url: str) -> None:
@@ -163,7 +193,7 @@ def main() -> None:
     with text_tab:
         render_text_panel(use_sample_mode, api_base_url)
     with vision_tab:
-        render_vision_panel(use_sample_mode)
+        render_vision_panel(use_sample_mode, api_base_url)
     with status_tab:
         render_backend_panel(use_sample_mode, api_base_url)
     with results_tab:

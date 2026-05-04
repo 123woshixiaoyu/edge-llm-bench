@@ -2,7 +2,7 @@
 
 This is a reviewer-facing dashboard for the Jetson-First Edge AI Inference Gateway.
 
-The demo is intentionally thin: it does not duplicate the router implementation or require Jetson/RTX services in its default path. Sample mode reads committed CSV/image evidence from the project and shows how the gateway routes text and vision tasks across local, remote, and reject paths.
+The demo is intentionally thin: it does not duplicate the router implementation or require Jetson/RTX services in its default path. Sample mode reads committed CSV/image evidence from the project and shows how the gateway routes text and vision tasks across local, remote, and reject paths. Real mode calls the Jetson Gateway API.
 
 ## Start
 
@@ -15,12 +15,12 @@ streamlit run demo/app.py
 ## Modes
 
 - **Sample mode**: default. Reads existing result files and the sample camera frame. No Jetson, RTX, model files, or TensorRT engine is required.
-- **Real backend mode**: optional. The text panel tries to call a running router API at `http://127.0.0.1:8000` or the URL entered in the dashboard. If the backend is unavailable, the UI shows a friendly sample fallback instead of crashing.
+- **Real backend mode**: optional. Text requests call `/v1/chat/completions`; vision requests call `/v1/vision/analyze`. If the backend is unavailable, the UI shows a friendly error or sample fallback instead of crashing.
 
 ## What It Shows
 
 - Text task routing across Jetson local LLM, RTX remote LLM, and reject paths.
-- Vision task routing across YOLOv8n TensorRT local CV, remote VLM placeholder/sample rows, and privacy rejects.
+- Vision task routing across YOLOv8n TensorRT local CV, real remote VLM when available, and privacy rejects.
 - Backend status for the selected local/remote LLM/CV/VLM roles.
 - Key result snapshots for quantization, ONNXRuntime session reuse, YOLO TensorRT FP16, and v0.7 reliability.
 
@@ -28,5 +28,22 @@ streamlit run demo/app.py
 
 - This is a dashboard, not a production serving layer.
 - Sample mode is evidence playback, not live inference.
-- Real vision backend calls are intentionally not wired in this lightweight UI.
+- Real vision mode is single-frame interaction, not video streaming.
+- Remote VLM routes are real when the RTX VLM service/tunnel is running, but they can take 15-20 seconds.
 - No login, database, cloud deploy, video stream, model download, or new benchmark is included.
+
+## Real Mode Services
+
+Use `serving/configs_interactive_demo` for the Jetson Gateway:
+
+```bash
+EDGE_ROUTER_CONFIG_DIR=serving/configs_interactive_demo \
+uvicorn serving.app.main:app --host 127.0.0.1 --port 8000
+```
+
+Expected runtime services:
+
+- Jetson local llama-server: `127.0.0.1:8080`
+- RTX remote llama-server tunnel: `127.0.0.1:18081`
+- Optional RTX remote VLM tunnel: `127.0.0.1:18091`
+- Jetson YOLO TensorRT engine: `/home/rainbow/models/vision/yolo_nano/yolov8n_fp16.engine`
