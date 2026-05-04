@@ -1,0 +1,258 @@
+from __future__ import annotations
+
+import csv
+import json
+import time
+import urllib.error
+import urllib.request
+from pathlib import Path
+from typing import Any
+
+from PIL import Image, ImageDraw
+
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
+SAMPLE_IMAGE = REPO_ROOT / "results" / "figures" / "camera_v05_positive_detection.jpg"
+TEXT_SMOKE_CSV = REPO_ROOT / "serving" / "results" / "raw" / "dual_real_backend_smoke.csv"
+VISION_SMOKE_CSV = REPO_ROOT / "serving" / "results" / "raw" / "vision_router_yolo_trt_smoke.csv"
+RELIABILITY_SUMMARY_CSV = REPO_ROOT / "serving" / "results" / "raw" / "reliability_summary.csv"
+LOCAL_CV_SUMMARY_CSV = REPO_ROOT / "serving" / "results" / "raw" / "local_cv_runtime_summary.csv"
+
+
+def read_csv(path: Path) -> list[dict[str, str]]:
+    if not path.exists():
+        return []
+    with path.open("r", encoding="utf-8", newline="") as handle:
+        return list(csv.DictReader(handle))
+
+
+def parse_jsonish(value: str | None, fallback: Any) -> Any:
+    if not value:
+        return fallback
+    try:
+        return json.loads(value)
+    except json.JSONDecodeError:
+        return fallback
+
+
+def _first(rows: list[dict[str, str]], **filters: str) -> dict[str, str] | None:
+    for row in rows:
+        if all(row.get(key) == value for key, value in filters.items()):
+            return row
+    return None
+
+
+def select_text_sample(
+    prompt: str,
+    task_type: str,
+    privacy: str,
+    quality: str,
+    latency_budget_ms: int,
+) -> dict[str, Any]:
+    rows = read_csv(TEXT_SMOKE_CSV)
+    row: dict[str, str] | None = None
+
+    if latency_budget_ms < 800 and task_type in {"code", "reasoning"}:
+        row = _first(rows, route="reject") or (rows[-1] if rows else None)
+    elif privacy == "local_only":
+        row = _first(rows, task_type=task_type, privacy="local_only") or _first(rows, route="local")
+    elif quality == "high" or task_type in {"code", "reasoning"}:
+        row = _first(rows, task_type=task_type, route="remote") or _first(rows, route="remote")
+    else:
+        row = _first(rows, task_type=task_type, route="local") or _first(rows, route="local")
+
+    if not row:
+        return {
+            "mode": "sample",
+            "route": "reject",
+            "selected_backend": "",
+            "backend_latency_ms": None,
+            "total_latency_ms": 0,
+            "response_preview": "No sample row is available for this request.",
+            "reasons": ["sample data unavailable"],
+            "input_preview": prompt[:120],
+        }
+
+    return {
+        "mode": "sample",
+        "route": row.get("route", ""),
+        "selected_backend": row.get("selected_model", ""),
+        "backend_latency_ms": row.get("backend_latency_ms") or None,
+        "total_latency_ms": row.get("total_latency_ms") or None,
+        "response_preview": row.get("short_response_preview", ""),
+        "reasons": [reason.strip() for reason in row.get("reasons", "").split(";") if reason.strip()],
+        "input_preview": prompt[:120],
+        "sample_request_id": row.get("request_id", ""),
+        "sample_source": str(TEXT_SMOKE_CSV.relative_to(REPO_ROOT)),
+    }
+
+
+def call_text_backend(
+    api_base_url: str,
+    prompt: str,
+    task_type: str,
+    privacy: str,
+    quality: str,
+    latency_budget_ms: int,
+) -> dict[str, Any]:
+    payload = {
+        "messages": [{"role": "user", "content": prompt}],
+        "task_type": task_type,
+        "privacy": privacy,
+        "quality": quality,
+        "latency_budget_ms": latency_budget_ms,
+        "stream": False,
+    }
+    start = time.perf_counter()
+    try:
+        request = urllib.request.Request(
+            f"{api_base_url.rstrip('/')}/v1/chat/completions",
+            data=json.dumps(payload).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with urllib.request.urlopen(request, timeout=5) as response:
+            raw = response.read().decode("utf-8")
+        elapsed_ms = round((time.perf_counter() - start) * 1000, 2)
+        data = json.loads(raw)
+        message = ""
+        if data.get("choices"):
+            message = data["choices"][0].get("message", {}).get("content", "")
+        return {
+            "mode": "real",
+            "route": data.get("route", "unknown"),
+            "selected_backend": data.get("selected_model") or data.get("model", ""),
+            "backend_latency_ms": data.get("backend_latency_ms"),
+            "total_latency_ms": data.get("total_latency_ms", elapsed_ms),
+            "response_preview": message[:500] or raw[:500],
+            "reasons": data.get("reasons", ["real backend response did not include route reasons"]),
+            "input_preview": prompt[:120],
+        }
+    except (urllib.error.URLError, TimeoutError, json.JSONDecodeError) as exc:
+        sample = select_text_sample(prompt, task_type, privacy, quality, latency_budget_ms)
+        sample["mode"] = "sample fallback"
+        sample["reasons"] = [f"real backend unavailable: {exc}", *sample["reasons"]]
+        return sample
+
+
+def select_vision_sample(task_type: str, privacy: str, quality: str) -> dict[str, Any]:
+    rows = read_csv(VISION_SMOKE_CSV)
+    row = _first(rows, task_type=task_type, privacy=privacy, quality=quality)
+    if not row and quality == "high":
+        row = _first(rows, task_type=task_type, quality="high")
+    if not row:
+        row = _first(rows, task_type=task_type) or (rows[0] if rows else None)
+
+    if not row:
+        return {
+            "mode": "sample",
+            "route": "reject",
+            "selected_backend": "",
+            "detected_labels": [],
+            "detections": [],
+            "reasons": ["sample data unavailable"],
+        }
+
+    return {
+        "mode": "sample",
+        "route": row.get("route", ""),
+        "selected_backend": row.get("selected_model", ""),
+        "remote_is_mock": row.get("remote_is_mock", ""),
+        "local_cv_backend": row.get("local_cv_backend", ""),
+        "local_cv_model": row.get("local_cv_model", ""),
+        "detected_labels": parse_jsonish(row.get("detected_labels"), []),
+        "detections": parse_jsonish(row.get("detections"), []),
+        "capture_latency_ms": row.get("capture_latency_ms") or None,
+        "local_cv_inference_latency_ms": row.get("local_cv_inference_latency_ms") or None,
+        "local_cv_total_latency_ms": row.get("local_cv_total_latency_ms") or None,
+        "remote_latency_ms": row.get("remote_latency_ms") or None,
+        "total_latency_ms": row.get("total_latency_ms") or None,
+        "reasons": parse_jsonish(row.get("reasons"), [row.get("reasons", "")]),
+        "sample_request_id": row.get("request_id", ""),
+        "sample_source": str(VISION_SMOKE_CSV.relative_to(REPO_ROOT)),
+    }
+
+
+def draw_detections(image_path: Any, detections: list[dict[str, Any]]) -> Image.Image | None:
+    if hasattr(image_path, "read"):
+        image = Image.open(image_path).convert("RGB")
+    else:
+        path = Path(image_path) if image_path else SAMPLE_IMAGE
+        if not path.exists():
+            return None
+        image = Image.open(path).convert("RGB")
+    draw = ImageDraw.Draw(image)
+    for detection in detections:
+        box = detection.get("box") or []
+        if len(box) != 4:
+            continue
+        label = detection.get("label", "object")
+        confidence = detection.get("confidence", 0)
+        x1, y1, x2, y2 = [int(float(value)) for value in box]
+        draw.rectangle((x1, y1, x2, y2), outline=(21, 120, 255), width=4)
+        draw.text((x1 + 4, max(0, y1 - 18)), f"{label} {confidence:.2f}", fill=(21, 120, 255))
+    return image
+
+
+def backend_status() -> dict[str, Any]:
+    reliability = read_csv(RELIABILITY_SUMMARY_CSV)
+    return {
+        "mode": "sample",
+        "local_llm": "Qwen3.5 0.8B Q4_K_M on Jetson",
+        "remote_llm": "Qwen3.5 4B Q4_K_M on RTX",
+        "local_cv": "YOLOv8n TensorRT FP16 on Jetson; MobileNet-SSD OpenCV DNN baseline retained",
+        "remote_vlm": "Gemma 4 E2B-it Q4_K_M + mmproj-F16 on RTX",
+        "queue_state": "v0.7 reliability benchmark uses prototype in-process inflight tracking",
+        "latest_reliability_pass_rate": reliability[-1].get("pass_rate") if reliability else "unknown",
+    }
+
+
+def key_result_tables() -> dict[str, list[dict[str, Any]]]:
+    local_cv_rows = read_csv(LOCAL_CV_SUMMARY_CSV)
+    reliability_rows = read_csv(RELIABILITY_SUMMARY_CSV)
+    return {
+        "local_cv_runtime_summary": local_cv_rows,
+        "reliability_summary": reliability_rows,
+        "backend_recommendations": [
+            {
+                "profile": "text_local_default",
+                "backend": "Qwen3.5 0.8B Q4_K_M on Jetson",
+                "why": "Highest Jetson useful throughput per watt while staying inside memory limits.",
+            },
+            {
+                "profile": "text_quality_fallback",
+                "backend": "Qwen3.5 4B Q4_K_M on RTX",
+                "why": "Larger text model for code, reasoning, and high-quality text tasks.",
+            },
+            {
+                "profile": "vision_local_fast_path",
+                "backend": "YOLOv8n TensorRT FP16 on Jetson",
+                "why": "Optimized local CV path, 14.54 ms average inference in Project 3.",
+            },
+            {
+                "profile": "vision_remote_semantic_backend",
+                "backend": "Gemma 4 E2B-it Q4_K_M + mmproj-F16 on RTX",
+                "why": "Real remote VLM for scene descriptions and VQA.",
+            },
+        ],
+    }
+
+
+def real_backend_health(api_base_url: str) -> dict[str, Any]:
+    start = time.perf_counter()
+    try:
+        with urllib.request.urlopen(f"{api_base_url.rstrip('/')}/health", timeout=3) as response:
+            raw = response.read().decode("utf-8")
+        return {
+            "mode": "real",
+            "healthy": True,
+            "latency_ms": round((time.perf_counter() - start) * 1000, 2),
+            "response": json.loads(raw),
+        }
+    except (urllib.error.URLError, TimeoutError, json.JSONDecodeError) as exc:
+        return {
+            "mode": "sample fallback",
+            "healthy": False,
+            "error": str(exc),
+            "sample_status": backend_status(),
+        }
