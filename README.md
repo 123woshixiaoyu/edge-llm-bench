@@ -9,7 +9,7 @@ This project is a Jetson-first edge AI inference gateway, not a single-model dem
 - **Project 1:** quantized LLM deployment decision study for Jetson and RTX.
 - **Project 2:** explainable task router across Jetson local LLM and RTX remote LLM.
 - **Project 2 v0.5:** camera-aware router with CSI camera, local CV, and remote VLM.
-- **Project 3:** local CV runtime optimization with ONNXRuntime, TensorRT FP16, and an INT8 calibration benchmark.
+- **Project 3:** local CV runtime optimization with ONNXRuntime, TensorRT FP16, INT8 calibration, and a C++ worker benchmark.
 - **v0.6/v0.7:** optimized YOLO TensorRT backend integrated into the vision router, then checked with a small reliability benchmark.
 - **Demo dashboard:** lightweight Streamlit sample-mode UI for reviewer walkthroughs.
 
@@ -74,6 +74,7 @@ Source: [docs/model_selection_scorecard.md](docs/model_selection_scorecard.md)
 | YOLO ONNXRuntime reuse | YOLOv8n | 91.70 | 107.10 | 108.64 | TensorRT comparison baseline |
 | YOLO TensorRT FP16 | YOLOv8n | 14.54 | 14.71 | 28.98 | Optimized local CV fast path |
 | YOLO TensorRT INT8 | YOLOv8n | 11.60 | 11.93 | 27.64 | Faster and smaller, but current calibration drifts to `no_detection` |
+| YOLO TensorRT C++ worker | YOLOv8n FP16 | 14.07 | 14.18 | 29.29 | Optional mixed Python/C++ hot-path benchmark |
 
 Source: [serving/docs/project3_tensorrt_report.md](serving/docs/project3_tensorrt_report.md)
 
@@ -144,6 +145,7 @@ Runtime assets are intentionally outside git:
 - [docs/quantization_decision_study.md](docs/quantization_decision_study.md)
 - [serving/docs/vision_routing_design.md](serving/docs/vision_routing_design.md)
 - [serving/docs/project3_tensorrt_report.md](serving/docs/project3_tensorrt_report.md)
+- [serving/docs/cpp_tensorrt_adapter.md](serving/docs/cpp_tensorrt_adapter.md)
 - [serving/docs/reliability_report.md](serving/docs/reliability_report.md)
 - [serving/docs/serving_design.md](serving/docs/serving_design.md)
 - [serving/docs/routing_policy.md](serving/docs/routing_policy.md)
@@ -157,10 +159,9 @@ Runtime assets are intentionally outside git:
 - Quality scores are partly manual / heuristic.
 - No Kubernetes, autoscaling, or production observability stack.
 - INT8 calibration has been benchmarked, but it is not the router default because the current calibration set causes detection drift.
-- No C++ hot-path adapter yet.
+- C++ hot-path worker is benchmarked but not yet connected as the router default.
 
 ## Next Steps
 
-- Python + C++ TensorRT hot-path adapter.
 - Remote VLM latency profiling and low-risk optimization.
 - Optional dashboard real-backend wiring for the vision path.
