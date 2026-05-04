@@ -170,6 +170,17 @@ The detector families are not compared as an accuracy benchmark because their we
 
 The important Phase 2 result is within-model consistency: YOLO ONNXRuntime and YOLO TensorRT FP16 produce the same mode label on every run, with very close confidence and bounding box values in sanity checks.
 
+## v0.6 Router Integration
+
+The TensorRT result is now connected back to Project 2 under an explicit vision router configuration. The default vision router keeps MobileNet-SSD/OpenCV DNN as the baseline path, while `serving/scripts/smoke_vision_router_yolo_trt.py` initializes the router with:
+
+```text
+local_cv_backend = yolo_tensorrt_fp16
+engine_path = /home/rainbow/models/vision/yolo_nano/yolov8n_fp16.engine
+```
+
+The v0.6 Jetson smoke uses a real CSI frame and the real YOLOv8n TensorRT FP16 engine. It produced `10/10` expected route matches with local `4`, remote `4`, reject `2`; all local rows used `yolo_tensorrt_fp16`, `fallback_used=false`, and local CV inference latency was about `14.4 ms`. Remote rows were intentionally mock in this smoke because v0.6 validates the local fast path; the real RTX VLM route was validated in v0.5b.
+
 ## Engineering Conclusion
 
 Phase 2 successfully enabled TensorRT and produced a working FP16 engine benchmark on Jetson:
@@ -178,5 +189,6 @@ Phase 2 successfully enabled TensorRT and produced a working FP16 engine benchma
 - SSD-MobileNetV1 ONNX is a TensorRT 10.3 compatibility blocker under the tested build settings.
 - YOLOv8n is a better TensorRT benchmark target because its ONNX graph follows a mature deployment path.
 - TensorRT FP16 brings a clear latency win for YOLOv8n on Jetson: roughly `6.3x` lower model inference latency and `3.7x` lower total latency than YOLO ONNXRuntime CPU reuse.
+- v0.6 proves that the optimized YOLO TensorRT backend is not just a benchmark result; it can serve the vision router's local detect/classify path under an explicit optimized configuration.
 
 Phase 3 should add INT8 calibration for YOLOv8n, using a small non-sensitive calibration set and comparing INT8 against this FP16 engine for latency, consistency, memory, and power.

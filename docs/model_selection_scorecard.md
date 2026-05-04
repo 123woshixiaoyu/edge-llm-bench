@@ -140,7 +140,7 @@ The scorecard preserves the current project decisions but makes their assumption
 
 - Jetson text default: Qwen3.5 0.8B `Q4_K_M`.
 - Text quality fallback: Qwen3.5 4B `Q4_K_M` on RTX, with Qwen3.5 4B `Q8_0` as a conservative but heavier alternative.
-- Jetson local CV fast path: YOLOv8n TensorRT FP16 for the optimized path; MobileNet-SSD remains the already-integrated v0.5 router baseline until the router policy is intentionally updated.
+- Jetson local CV fast path: YOLOv8n TensorRT FP16. v0.6 explicitly integrates this recommendation into the vision router for the optimized local detect/classify path, while MobileNet-SSD remains the default baseline/fallback.
 - Remote semantic vision: Gemma 4 E2B-it `Q4_K_M` + `mmproj-F16`, real but latency-heavy.
 
 The score is not an absolute truth. It is a compact way to make deployment preferences explicit and reproducible.

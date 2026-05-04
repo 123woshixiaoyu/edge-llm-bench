@@ -1,0 +1,10 @@
+vision_policy:
+  local_cv_backend: yolo_tensorrt_fp16
+  local_cv_engine_path: /home/rainbow/models/vision/yolo_nano/yolov8n_fp16.engine
+  local_cv_model_dir: /home/rainbow/models/vision/yolo_nano
+  fallback_local_cv_backend: mobilenet_ssd_opencv_dnn
+  fallback_model_dir: /home/rainbow/models/vision/mobilenet_ssd
+  remote_vlm_required_for:
+    - vqa
+    - scene_description
+  reject_remote_when_privacy: local_only

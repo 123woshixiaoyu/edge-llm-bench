@@ -340,6 +340,26 @@ Current v0.5b result:
 
 Images are sent to the RTX backend as base64 in the HTTP request, not as local file paths, because Jetson paths are not readable from WSL.
 
+v0.6 integrates the scorecard-selected local CV fast path back into the vision router. The default vision router still keeps MobileNet-SSD/OpenCV DNN as the baseline/fallback path, while the explicit YOLO TensorRT configuration makes local `detect` / `classify` requests use the Jetson TensorRT FP16 engine:
+
+```bash
+env LD_LIBRARY_PATH=/usr/lib/aarch64-linux-gnu/nvidia:/usr/local/cuda/targets/aarch64-linux/lib \
+  python3 serving/scripts/smoke_vision_router_yolo_trt.py
+```
+
+Current v0.6 result:
+
+- smoke CSV: [serving/results/raw/vision_router_yolo_trt_smoke.csv](serving/results/raw/vision_router_yolo_trt_smoke.csv)
+- local CV baseline CSV: [serving/results/raw/local_cv_yolo_trt_router_baseline.csv](serving/results/raw/local_cv_yolo_trt_router_baseline.csv)
+- local CV backend: `yolo_tensorrt_fp16`, model `yolov8n_tensorrt_fp16`
+- TensorRT engine: `/home/rainbow/models/vision/yolo_nano/yolov8n_fp16.engine`
+- route distribution: local `4`, remote `4`, reject `2`
+- expected routes: `10/10`
+- local CV inference latency: about `14.4 ms`
+- capture latency: about `1298.76 ms`
+- `fallback_used=false` for all rows
+- remote rows are intentionally mock in this v0.6 smoke; the real remote VLM path was already validated in v0.5b
+
 ## Project 3: Local CV ONNX / TensorRT Optimization
 
 Project 3 starts from the v0.5 local CV path and measures runtime choices for Jetson deployment. MobileNet-SSD Caffe through OpenCV DNN remains the v0.5 router baseline. Phase 1 used SSD-MobileNetV1 ONNX for ONNXRuntime feasibility, Phase 1.5 fixed ONNXRuntime session lifecycle overhead, and Phase 2 switches the TensorRT optimization object to YOLOv8n because SSD-MobileNetV1 ONNX hits a TensorRT 10.3 graph compatibility blocker.

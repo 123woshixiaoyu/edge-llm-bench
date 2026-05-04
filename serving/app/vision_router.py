@@ -9,6 +9,7 @@ from pathlib import Path
 from .backends.vlm import HttpVLMBackend
 from .camera import CameraFrame, capture_frame
 from .local_cv import LocalCVResult, run_mobilenet_ssd
+from .local_cv_yolo import YoloTensorRTDetector
 from .vision_analyzer import ImageSource, VisionPrivacy, VisionQuality, VisionTaskType, analyze_vision_task
 from .vision_policy import VisionDecision, VisionPolicyEngine
 
@@ -72,12 +73,33 @@ class VisionRouter:
         self,
         *,
         model_dir: Path | None = None,
+        local_cv_backend: str = "mobilenet_ssd_opencv_dnn",
+        yolo_engine_path: Path | None = None,
+        fallback_to_mobilenet: bool = True,
         policy: VisionPolicyEngine | None = None,
         remote_backend: HttpVLMBackend | None = None,
     ):
         self.model_dir = model_dir
-        self.policy = policy or VisionPolicyEngine()
+        self.local_cv_backend = local_cv_backend
+        self.yolo_engine_path = yolo_engine_path
+        self.fallback_to_mobilenet = fallback_to_mobilenet
+        self._yolo_detector: YoloTensorRTDetector | None = None
+        local_cv_model = "yolov8n_tensorrt_fp16" if local_cv_backend == "yolo_tensorrt_fp16" else "mobilenet_ssd_voc_opencv_dnn"
+        self.policy = policy or VisionPolicyEngine(local_cv_model=local_cv_model)
         self.remote_backend = remote_backend
+
+    def _annotate_local_cv(
+        self,
+        result: LocalCVResult,
+        *,
+        backend: str,
+        engine_path: str = "",
+        fallback_used: bool = False,
+    ) -> LocalCVResult:
+        result.local_cv_backend = backend
+        result.engine_path = engine_path
+        result.fallback_used = fallback_used
+        return result
 
     def default_remote_prompt(self, request: VisionRequest, local_cv: LocalCVResult) -> str:
         labels = ", ".join(local_cv.detected_labels) if local_cv.detected_labels else "none"
@@ -105,10 +127,12 @@ class VisionRouter:
             latency_budget_ms=request.latency_budget_ms,
             local_cv_available=local_cv_available,
         )
+        if getattr(local_cv, "fallback_used", False):
+            decision.reasons.append(f"local CV fallback used: {local_cv.error or 'fallback reason unavailable'}")
         remote_latency_ms = None
         remote_model = None
         remote_response_text = ""
-        error = local_cv.error if decision.route == "local" and not local_cv.ok else ""
+        error = local_cv.error if decision.route == "local" and (not local_cv.ok or getattr(local_cv, "fallback_used", False)) else ""
         if decision.route == "remote":
             if self.remote_backend is None:
                 remote_response_text, remote_latency_ms = mock_remote_vlm_result(
@@ -161,7 +185,7 @@ class VisionRouter:
         if not capture.ok:
             local_cv = LocalCVResult(
                 ok=False,
-                model="mobilenet_ssd_voc_opencv_dnn",
+                model=self.local_cv_backend,
                 model_dir=str(self.model_dir or ""),
                 detected_labels=[],
                 detections=[],
@@ -169,9 +193,65 @@ class VisionRouter:
                 total_latency_ms=None,
                 error=capture.error,
             )
-            return capture, local_cv
-        local_cv = run_mobilenet_ssd(Path(capture.image_path), model_dir=self.model_dir)
+            engine_path = str(self.yolo_engine_path or "") if self.local_cv_backend == "yolo_tensorrt_fp16" else ""
+            return capture, self._annotate_local_cv(local_cv, backend=self.local_cv_backend, engine_path=engine_path)
+        local_cv = self.run_local_cv(Path(capture.image_path))
         return capture, local_cv
+
+    def run_local_cv(self, image_path: Path) -> LocalCVResult:
+        if self.local_cv_backend == "mobilenet_ssd_opencv_dnn":
+            result = run_mobilenet_ssd(image_path, model_dir=self.model_dir)
+            return self._annotate_local_cv(result, backend="mobilenet_ssd_opencv_dnn")
+        if self.local_cv_backend == "yolo_tensorrt_fp16":
+            engine_path = str(self.yolo_engine_path or "")
+            try:
+                if self._yolo_detector is None:
+                    self._yolo_detector = YoloTensorRTDetector(engine_path=self.yolo_engine_path, warmup=3)
+                result = self._yolo_detector.detect(image_path)
+                if result.ok:
+                    return self._annotate_local_cv(result, backend="yolo_tensorrt_fp16", engine_path=engine_path)
+                if not self.fallback_to_mobilenet:
+                    return self._annotate_local_cv(result, backend="yolo_tensorrt_fp16", engine_path=engine_path)
+                fallback = run_mobilenet_ssd(image_path, model_dir=self.model_dir)
+                fallback.error = f"fallback_to_mobilenet_after_yolo_error: {result.error}"
+                return self._annotate_local_cv(
+                    fallback,
+                    backend="yolo_tensorrt_fp16",
+                    engine_path=engine_path,
+                    fallback_used=True,
+                )
+            except Exception as exc:
+                if not self.fallback_to_mobilenet:
+                    result = LocalCVResult(
+                        ok=False,
+                        model="yolov8n_tensorrt_fp16",
+                        model_dir=str(Path(self.yolo_engine_path).parent if self.yolo_engine_path else ""),
+                        detected_labels=[],
+                        detections=[],
+                        inference_latency_ms=None,
+                        total_latency_ms=None,
+                        error=f"YOLO TensorRT backend unavailable: {exc}",
+                    )
+                    return self._annotate_local_cv(result, backend="yolo_tensorrt_fp16", engine_path=engine_path)
+                fallback = run_mobilenet_ssd(image_path, model_dir=self.model_dir)
+                fallback.error = f"fallback_to_mobilenet_after_yolo_unavailable: {exc}"
+                return self._annotate_local_cv(
+                    fallback,
+                    backend="yolo_tensorrt_fp16",
+                    engine_path=engine_path,
+                    fallback_used=True,
+                )
+        result = LocalCVResult(
+            ok=False,
+            model=self.local_cv_backend,
+            model_dir=str(self.model_dir or ""),
+            detected_labels=[],
+            detections=[],
+            inference_latency_ms=None,
+            total_latency_ms=None,
+            error=f"unknown local_cv_backend: {self.local_cv_backend}",
+        )
+        return self._annotate_local_cv(result, backend=self.local_cv_backend)
 
 
 def detections_json(result: LocalCVResult) -> str:

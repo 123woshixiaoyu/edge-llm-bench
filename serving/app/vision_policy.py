@@ -71,7 +71,7 @@ class VisionPolicyEngine:
                 selected_model=None,
                 reasons=[
                     "privacy=local_only prevents sending image to remote VLM",
-                    "local CV baseline only supports detection/classification, not high-level semantic explanation",
+                    "local CV backend only supports detection/classification, not high-level semantic explanation",
                 ],
                 estimated_risk="high",
             )
@@ -99,7 +99,7 @@ class VisionPolicyEngine:
                     reasons=["local CV unavailable and remote VLM unavailable"],
                     estimated_risk="high",
                 )
-            reasons.append(f"task_type={analysis.task_type} is covered by the local CV baseline")
+            reasons.append(f"task_type={analysis.task_type} is covered by local CV backend {self.local_cv_model}")
             reasons.append("quality is not high, so remote VLM is unnecessary")
             return VisionDecision(
                 route="local",

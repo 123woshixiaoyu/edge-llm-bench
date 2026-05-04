@@ -2,9 +2,9 @@
 
 ## Scope
 
-v0.5a upgraded Project 2 from a text-only heterogeneous LLM router into a camera-aware edge AI router. Camera capture and local CV are real. v0.5b keeps that Jetson path and replaces the remote VLM placeholder with a real RTX/WSL VLM backend.
+v0.5a upgraded Project 2 from a text-only heterogeneous LLM router into a camera-aware edge AI router. Camera capture and local CV are real. v0.5b keeps that Jetson path and replaces the remote VLM placeholder with a real RTX/WSL VLM backend. v0.6 adds an explicit YOLOv8n TensorRT FP16 local CV fast path while keeping the MobileNet-SSD baseline available.
 
-This stage does not add TensorRT, video streaming, multi-camera support, or camera input to the text LLM router.
+This stage does not add video streaming, multi-camera support, camera input to the text LLM router, or TensorRT for VLM/text inference.
 
 ## Why Add Camera Input
 
@@ -15,7 +15,7 @@ The Jetson is physically close to the sensor, so it is the right place to make t
 ```mermaid
 flowchart TD
     A["CSI camera"] --> B["GStreamer Argus capture"]
-    B --> C["Local CV baseline"]
+    B --> C["Local CV backend"]
     C --> D["Vision analyzer"]
     D --> E["Vision policy"]
     E -->|detect / classify| F["Local result on Jetson"]
@@ -137,6 +137,39 @@ The `no_detection` label above was a sample-content issue, not a pipeline failur
 
 This positive run proves that the v0.5a path is not only capturing frames and executing a model, but also producing a real local object detection result from the Jetson CSI camera.
 
+## v0.6 YOLO TensorRT Local Fast Path
+
+Project 3 selected YOLOv8n TensorRT FP16 as the `vision_local_fast_path` because it reduced YOLO inference latency to about `14.54 ms` in the fixed-image benchmark. v0.6 connects that optimized runtime back to the vision router under an explicit configuration:
+
+- default router path: MobileNet-SSD/OpenCV DNN baseline remains available;
+- v0.6 path: `local_cv_backend=yolo_tensorrt_fp16`;
+- engine path: `/home/rainbow/models/vision/yolo_nano/yolov8n_fp16.engine`;
+- local `detect` / `classify` requests use `YoloTensorRTDetector`;
+- the TensorRT engine/context is loaded once and reused by the router.
+
+The v0.6 smoke intentionally keeps remote VLM rows as mock rows. This stage validates the optimized local fast path. The real remote VLM route was already validated separately in v0.5b.
+
+Smoke outputs:
+
+- `serving/results/raw/local_cv_yolo_trt_router_baseline.csv`
+- `serving/results/raw/vision_router_yolo_trt_smoke.csv`
+
+Current v0.6 result:
+
+- cases: `10`
+- route matches: `10/10`
+- route distribution: local `4`, remote `4`, reject `2`
+- local CV backend: `yolo_tensorrt_fp16`
+- local CV model: `yolov8n_tensorrt_fp16`
+- local CV inference latency: about `14.4 ms`
+- local CV total latency: about `61.11 ms`
+- capture latency: about `1298.76 ms`
+- detected label: `chair`
+- `fallback_used=false`
+- remote rows: `remote_is_mock=true`
+
+MobileNet-SSD is still useful as a simple integration baseline and fallback. v0.6 does not remove or invalidate that path; it adds the faster backend for the explicit optimized configuration.
+
 ## v0.5b Real Remote VLM
 
 v0.5b connects the semantic vision route to a real RTX/WSL backend. The selected model is the locally available Gemma 4 E2B-it multimodal GGUF pair:
@@ -160,7 +193,7 @@ remote VLM server -> llama-mtmd-cli
 
 Remote route behavior:
 
-- `detect` / `classify`, low or medium quality: local MobileNet-SSD on Jetson
+- `detect` / `classify`, low or medium quality: local CV backend on Jetson. The default path is MobileNet-SSD; the explicit v0.6 optimized path is YOLOv8n TensorRT FP16.
 - `vqa` / `scene_description`, `privacy=allow_remote`: RTX VLM
 - high-quality visual task with `privacy=allow_remote`: RTX VLM
 - semantic vision task with `privacy=local_only`: reject, because the image must not leave Jetson
@@ -200,4 +233,4 @@ v0.5b adds:
 - non-mock remote semantic vision responses;
 - CSV evidence that remote rows used `remote_is_mock=false`.
 
-TensorRT, video streaming, persistent VLM serving optimization, and local Jetson VLM are still out of scope.
+Video streaming, persistent VLM serving optimization, and local Jetson VLM are still out of scope. TensorRT is now used only for the explicit v0.6 local CV fast path, not for VLM or the text router.
