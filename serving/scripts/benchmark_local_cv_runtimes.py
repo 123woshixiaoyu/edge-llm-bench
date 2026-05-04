@@ -38,7 +38,7 @@ def run_once(runtime: str, image_path: Path, args, detector=None):
         return detector.detect(image_path)
     if runtime == "tensorrt_fp16":
         return run_tensorrt_fp16(image_path, engine_path=args.trt_engine)
-    if runtime in ("yolo_onnxruntime_cpu_reuse", "yolo_tensorrt_fp16"):
+    if runtime in ("yolo_onnxruntime_cpu_reuse", "yolo_tensorrt_fp16", "yolo_tensorrt_int8"):
         return detector.detect(image_path)
     raise ValueError(f"unknown runtime: {runtime}")
 
@@ -54,6 +54,7 @@ def main() -> int:
             "tensorrt_fp16",
             "yolo_onnxruntime_cpu_reuse",
             "yolo_tensorrt_fp16",
+            "yolo_tensorrt_int8",
         ],
         required=True,
     )
@@ -80,6 +81,11 @@ def main() -> int:
         "--yolo-trt-engine",
         type=Path,
         default=Path("/home/rainbow/models/vision/yolo_nano/yolov8n_fp16.engine"),
+    )
+    parser.add_argument(
+        "--yolo-int8-engine",
+        type=Path,
+        default=Path("/home/rainbow/models/vision/yolo_nano/yolov8n_int8.engine"),
     )
     parser.add_argument("--confidence-threshold", type=float, default=0.2)
     parser.add_argument("--iou-threshold", type=float, default=0.45)
@@ -111,6 +117,15 @@ def main() -> int:
             confidence_threshold=args.confidence_threshold,
             iou_threshold=args.iou_threshold,
             warmup=args.warmup,
+        )
+        session_init_latency_ms = detector.engine_init_latency_ms
+    elif args.runtime == "yolo_tensorrt_int8":
+        detector = YoloTensorRTDetector(
+            engine_path=args.yolo_int8_engine,
+            confidence_threshold=args.confidence_threshold,
+            iou_threshold=args.iou_threshold,
+            warmup=args.warmup,
+            model_name="yolov8n_tensorrt_int8",
         )
         session_init_latency_ms = detector.engine_init_latency_ms
 

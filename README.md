@@ -9,8 +9,9 @@ This project is a Jetson-first edge AI inference gateway, not a single-model dem
 - **Project 1:** quantized LLM deployment decision study for Jetson and RTX.
 - **Project 2:** explainable task router across Jetson local LLM and RTX remote LLM.
 - **Project 2 v0.5:** camera-aware router with CSI camera, local CV, and remote VLM.
-- **Project 3:** local CV runtime optimization with ONNXRuntime and TensorRT.
+- **Project 3:** local CV runtime optimization with ONNXRuntime, TensorRT FP16, and an INT8 calibration benchmark.
 - **v0.6/v0.7:** optimized YOLO TensorRT backend integrated into the vision router, then checked with a small reliability benchmark.
+- **Demo dashboard:** lightweight Streamlit sample-mode UI for reviewer walkthroughs.
 
 Model responsibilities are intentionally separated:
 
@@ -72,6 +73,7 @@ Source: [docs/model_selection_scorecard.md](docs/model_selection_scorecard.md)
 | ONNXRuntime reuse | SSD-MobileNetV1 | 42.02 | 41.67 | 49.04 | Session reuse removes adapter overhead |
 | YOLO ONNXRuntime reuse | YOLOv8n | 91.70 | 107.10 | 108.64 | TensorRT comparison baseline |
 | YOLO TensorRT FP16 | YOLOv8n | 14.54 | 14.71 | 28.98 | Optimized local CV fast path |
+| YOLO TensorRT INT8 | YOLOv8n | 11.60 | 11.93 | 27.64 | Faster and smaller, but current calibration drifts to `no_detection` |
 
 Source: [serving/docs/project3_tensorrt_report.md](serving/docs/project3_tensorrt_report.md)
 
@@ -126,6 +128,7 @@ Main entry points:
 - Real remote VLM smoke: `python3 serving/scripts/smoke_vision_router_real_vlm.py --remote-url http://127.0.0.1:18091`
 - YOLO TensorRT router smoke: `python3 serving/scripts/smoke_vision_router_yolo_trt.py`
 - Reliability benchmark: `python3 serving/scripts/reliability_benchmark.py --mode vision --concurrency 1,2,4,8 --requests 20`
+- Demo dashboard: `streamlit run demo/app.py`
 
 Runtime assets are intentionally outside git:
 
@@ -153,12 +156,11 @@ Runtime assets are intentionally outside git:
 - Model weights and TensorRT engines are not included in git.
 - Quality scores are partly manual / heuristic.
 - No Kubernetes, autoscaling, or production observability stack.
-- No INT8 calibration yet.
+- INT8 calibration has been benchmarked, but it is not the router default because the current calibration set causes detection drift.
 - No C++ hot-path adapter yet.
 
 ## Next Steps
 
-- TensorRT INT8 calibration for YOLOv8n.
 - Python + C++ TensorRT hot-path adapter.
 - Remote VLM latency profiling and low-risk optimization.
-- Optional lightweight demo dashboard.
+- Optional dashboard real-backend wiring for the vision path.

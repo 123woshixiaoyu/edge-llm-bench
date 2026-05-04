@@ -1,0 +1,25 @@
+image_id,image_path,width,height,notes,privacy_ok,used_for_calibration
+calib_001,/home/rainbow/models/vision/yolo_nano/calibration_images/calib_001.jpg,1280,720,derived from camera_v05_positive_detection.jpg; original; limited non-sensitive project sample coverage,true,true
+calib_002,/home/rainbow/models/vision/yolo_nano/calibration_images/calib_002.jpg,1280,720,derived from camera_v05_positive_detection.jpg; flip_horizontal; limited non-sensitive project sample coverage,true,true
+calib_003,/home/rainbow/models/vision/yolo_nano/calibration_images/calib_003.jpg,1280,720,derived from camera_v05_positive_detection.jpg; brightness_0.75; limited non-sensitive project sample coverage,true,true
+calib_004,/home/rainbow/models/vision/yolo_nano/calibration_images/calib_004.jpg,1280,720,derived from camera_v05_positive_detection.jpg; brightness_1.15; limited non-sensitive project sample coverage,true,true
+calib_005,/home/rainbow/models/vision/yolo_nano/calibration_images/calib_005.jpg,1280,720,derived from camera_v05_positive_detection.jpg; center_crop; limited non-sensitive project sample coverage,true,true
+calib_006,/home/rainbow/models/vision/yolo_nano/calibration_images/calib_006.jpg,1280,720,derived from camera_v05_positive_detection.jpg; left_crop; limited non-sensitive project sample coverage,true,true
+calib_007,/home/rainbow/models/vision/yolo_nano/calibration_images/calib_007.jpg,1280,720,derived from camera_v05_real_vlm_sample.jpg; original; limited non-sensitive project sample coverage,true,true
+calib_008,/home/rainbow/models/vision/yolo_nano/calibration_images/calib_008.jpg,1280,720,derived from camera_v05_real_vlm_sample.jpg; flip_horizontal; limited non-sensitive project sample coverage,true,true
+calib_009,/home/rainbow/models/vision/yolo_nano/calibration_images/calib_009.jpg,1280,720,derived from camera_v05_real_vlm_sample.jpg; brightness_0.75; limited non-sensitive project sample coverage,true,true
+calib_010,/home/rainbow/models/vision/yolo_nano/calibration_images/calib_010.jpg,1280,720,derived from camera_v05_real_vlm_sample.jpg; brightness_1.15; limited non-sensitive project sample coverage,true,true
+calib_011,/home/rainbow/models/vision/yolo_nano/calibration_images/calib_011.jpg,1280,720,derived from camera_v05_real_vlm_sample.jpg; center_crop; limited non-sensitive project sample coverage,true,true
+calib_012,/home/rainbow/models/vision/yolo_nano/calibration_images/calib_012.jpg,1280,720,derived from camera_v05_real_vlm_sample.jpg; left_crop; limited non-sensitive project sample coverage,true,true
+calib_013,/home/rainbow/models/vision/yolo_nano/calibration_images/calib_013.jpg,1280,720,derived from camera_v05_sample.jpg; original; limited non-sensitive project sample coverage,true,true
+calib_014,/home/rainbow/models/vision/yolo_nano/calibration_images/calib_014.jpg,1280,720,derived from camera_v05_sample.jpg; flip_horizontal; limited non-sensitive project sample coverage,true,true
+calib_015,/home/rainbow/models/vision/yolo_nano/calibration_images/calib_015.jpg,1280,720,derived from camera_v05_sample.jpg; brightness_0.75; limited non-sensitive project sample coverage,true,true
+calib_016,/home/rainbow/models/vision/yolo_nano/calibration_images/calib_016.jpg,1280,720,derived from camera_v05_sample.jpg; brightness_1.15; limited non-sensitive project sample coverage,true,true
+calib_017,/home/rainbow/models/vision/yolo_nano/calibration_images/calib_017.jpg,1280,720,derived from camera_v05_sample.jpg; center_crop; limited non-sensitive project sample coverage,true,true
+calib_018,/home/rainbow/models/vision/yolo_nano/calibration_images/calib_018.jpg,1280,720,derived from camera_v05_sample.jpg; left_crop; limited non-sensitive project sample coverage,true,true
+calib_019,/home/rainbow/models/vision/yolo_nano/calibration_images/calib_019.jpg,1280,720,derived from camera_smoke_after_jetson_io.jpg; original; limited non-sensitive project sample coverage,true,true
+calib_020,/home/rainbow/models/vision/yolo_nano/calibration_images/calib_020.jpg,1280,720,derived from camera_smoke_after_jetson_io.jpg; flip_horizontal; limited non-sensitive project sample coverage,true,true
+calib_021,/home/rainbow/models/vision/yolo_nano/calibration_images/calib_021.jpg,1280,720,derived from camera_smoke_after_jetson_io.jpg; brightness_0.75; limited non-sensitive project sample coverage,true,true
+calib_022,/home/rainbow/models/vision/yolo_nano/calibration_images/calib_022.jpg,1280,720,derived from camera_smoke_after_jetson_io.jpg; brightness_1.15; limited non-sensitive project sample coverage,true,true
+calib_023,/home/rainbow/models/vision/yolo_nano/calibration_images/calib_023.jpg,1280,720,derived from camera_smoke_after_jetson_io.jpg; center_crop; limited non-sensitive project sample coverage,true,true
+calib_024,/home/rainbow/models/vision/yolo_nano/calibration_images/calib_024.jpg,1280,720,derived from camera_smoke_after_jetson_io.jpg; left_crop; limited non-sensitive project sample coverage,true,true

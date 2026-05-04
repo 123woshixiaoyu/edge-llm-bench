@@ -108,6 +108,12 @@ def default_yolo_engine_path() -> Path:
     )
 
 
+def default_yolo_int8_engine_path() -> Path:
+    return Path(
+        os.environ.get("EDGE_YOLO_TRT_INT8_ENGINE", "/home/rainbow/models/vision/yolo_nano/yolov8n_int8.engine")
+    )
+
+
 def _letterbox(image: np.ndarray, size: int = 640) -> tuple[np.ndarray, float, float, float]:
     import cv2
 
@@ -417,11 +423,14 @@ class YoloTensorRTDetector:
         confidence_threshold: float = 0.25,
         iou_threshold: float = 0.45,
         warmup: int = 0,
+        model_name: str | None = None,
     ):
         self.engine_path = Path(engine_path) if engine_path else default_yolo_engine_path()
         self.confidence_threshold = confidence_threshold
         self.iou_threshold = iou_threshold
-        self.model_name = "yolov8n_tensorrt_fp16"
+        self.model_name = model_name or (
+            "yolov8n_tensorrt_int8" if "int8" in self.engine_path.name.lower() else "yolov8n_tensorrt_fp16"
+        )
         self.device_buffers: dict[str, ctypes.c_void_p] = {}
         self.host_outputs: dict[str, np.ndarray] = {}
         self.stream = ctypes.c_void_p()
