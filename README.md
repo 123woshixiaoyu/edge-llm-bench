@@ -133,7 +133,8 @@ Main entry points:
 - Real remote VLM smoke: `python3 serving/scripts/smoke_vision_router_real_vlm.py --remote-url http://127.0.0.1:18091`
 - YOLO TensorRT router smoke: `python3 serving/scripts/smoke_vision_router_yolo_trt.py`
 - Reliability benchmark: `python3 serving/scripts/reliability_benchmark.py --mode vision --concurrency 1,2,4,8 --requests 20`
-- Demo dashboard: `streamlit run demo/app.py`
+- Interactive demo stack: `python3 demo/run_interactive_stack.py`, then `python3 demo/check_interactive_stack.py`
+- Demo dashboard: `streamlit run demo/app.py` or `python3 demo/run_interactive_stack.py --with-ui`
 - Interactive gateway smoke: `python3 serving/scripts/smoke_interactive_gateway.py --url http://127.0.0.1:8000`
 - Interactive demo notes: [serving/docs/interactive_gateway_demo.md](serving/docs/interactive_gateway_demo.md)
 - Setup notes: [docs/setup_requirements.md](docs/setup_requirements.md)

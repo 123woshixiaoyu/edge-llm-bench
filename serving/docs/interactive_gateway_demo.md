@@ -60,7 +60,28 @@ The UI intentionally separates local CV precheck evidence from the final routed 
 
 ## Runtime Configuration
 
-Use the v0.9 config directory on Jetson:
+The recommended demo entry point is the lightweight orchestrator from the WSL repo root:
+
+```bash
+python3 demo/run_interactive_stack.py
+python3 demo/check_interactive_stack.py
+```
+
+It starts the RTX local services, SSH reverse tunnels, Jetson local LLM, and Jetson Gateway, then writes logs and PID state to `runtime_logs/interactive_stack/`. It is demo stack orchestration, not production deployment: there is no Docker, systemd, autoscaling, or process supervisor beyond start/check/stop scripts.
+
+Use `--with-ui` to start Streamlit as part of the stack, or run it separately:
+
+```bash
+streamlit run demo/app.py
+```
+
+Stop only the processes launched by the orchestrator:
+
+```bash
+python3 demo/stop_interactive_stack.py
+```
+
+The manual fallback is to use the v0.9 config directory on Jetson:
 
 ```bash
 EDGE_ROUTER_CONFIG_DIR=serving/configs_interactive_demo \

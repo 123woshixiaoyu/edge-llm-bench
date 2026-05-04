@@ -4,13 +4,39 @@ This is a reviewer-facing dashboard for the Jetson-First Edge AI Inference Gatew
 
 The demo is intentionally thin: it does not duplicate the router implementation or require Jetson/RTX services in its default path. Sample mode reads committed CSV/image evidence from the project and shows how the gateway routes text and vision tasks across local, remote, and reject paths. Real mode calls the Jetson Gateway API.
 
-## Start
+## Recommended Real-Mode Start
 
 From the repository root:
 
 ```bash
+python3 demo/run_interactive_stack.py
+python3 demo/check_interactive_stack.py
+```
+
+This starts the RTX-side remote LLM/VLM services, SSH reverse tunnels to Jetson, the Jetson local LLM, and the Jetson Gateway. Runtime logs and PID state are written under `runtime_logs/interactive_stack/`, which is intentionally ignored by git.
+
+Open the dashboard separately:
+
+```bash
 streamlit run demo/app.py
 ```
+
+Or start it with the stack:
+
+```bash
+python3 demo/run_interactive_stack.py --with-ui
+```
+
+When finished:
+
+```bash
+python3 demo/stop_interactive_stack.py
+python3 demo/check_interactive_stack.py
+```
+
+In the browser, set **Router API base URL** to `http://192.168.1.102:8000` for real backend mode.
+
+The old manual multi-terminal flow still works as a fallback: start the RTX remote llama-server, RTX VLM server, SSH reverse tunnels, Jetson local llama-server, Jetson Gateway, and Streamlit UI separately.
 
 ## Modes
 
