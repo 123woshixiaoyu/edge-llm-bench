@@ -1,0 +1,92 @@
+{
+  "profiles": {
+    "text_local_default": {
+      "description": "Choose the default Jetson local text model for low-latency private/default requests.",
+      "filters": {
+        "task_family": ["text"],
+        "backend_type": ["local_llm"],
+        "hardware_contains": "Jetson"
+      },
+      "hard_constraints": {
+        "failures_equal": 0,
+        "max_peak_memory_mb": 6000,
+        "min_decode_tok_s": 15,
+        "privacy_capability_contains": "local_only"
+      },
+      "required_metrics": ["decode_tok_s", "peak_memory_mb"],
+      "weights": {
+        "performance_score": 0.25,
+        "quality_score": 0.20,
+        "memory_score": 0.20,
+        "power_score": 0.15,
+        "stability_score": 0.10,
+        "thermal_score": 0.05,
+        "size_score": 0.05
+      }
+    },
+    "text_quality_fallback": {
+      "description": "Choose a stronger text fallback when quality matters more than low-latency Jetson defaults.",
+      "filters": {
+        "task_family": ["text"],
+        "backend_type": ["local_llm", "remote_llm"]
+      },
+      "hard_constraints": {
+        "failures_equal": 0,
+        "min_decode_tok_s": 10,
+        "min_quality_score_manual": 4.0
+      },
+      "required_metrics": ["decode_tok_s"],
+      "weights": {
+        "quality_score": 0.35,
+        "performance_score": 0.20,
+        "memory_score": 0.15,
+        "stability_score": 0.15,
+        "power_score": 0.05,
+        "thermal_score": 0.05,
+        "size_score": 0.05
+      }
+    },
+    "vision_local_fast_path": {
+      "description": "Choose the local Jetson CV runtime for fast detect/classify tasks.",
+      "filters": {
+        "task_family": ["cv"],
+        "backend_type": ["local_cv"],
+        "hardware_contains": "Jetson"
+      },
+      "hard_constraints": {
+        "failures_equal": 0,
+        "privacy_capability_contains": "local_only"
+      },
+      "required_any_metrics": ["cv_total_latency_ms", "cv_inference_latency_ms"],
+      "weights": {
+        "performance_score": 0.35,
+        "stability_score": 0.20,
+        "integration_score": 0.15,
+        "quality_score": 0.15,
+        "memory_score": 0.10,
+        "power_score": 0.05
+      }
+    },
+    "vision_remote_semantic_backend": {
+      "description": "Choose the remote visual semantic backend for VQA and scene understanding when privacy allows remote processing.",
+      "filters": {
+        "task_family": ["vlm"],
+        "backend_type": ["remote_vlm"]
+      },
+      "hard_constraints": {
+        "failures_equal": 0,
+        "remote_is_mock": false,
+        "privacy_capability_contains": "allow_remote"
+      },
+      "required_metrics": ["vlm_latency_ms"],
+      "weights": {
+        "quality_score": 0.35,
+        "stability_score": 0.20,
+        "integration_score": 0.20,
+        "performance_score": 0.15,
+        "memory_score": 0.05,
+        "size_score": 0.05
+      }
+    }
+  }
+}

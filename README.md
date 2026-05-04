@@ -152,6 +152,35 @@ Gemma 4 E2B Q8_0 is feasible on Jetson, but Q4_K_M is the better Gemma-side depl
 
 Cross-hardware comparison: [results/figures/jetson_vs_5090.md](results/figures/jetson_vs_5090.md).
 
+## Model / Backend Selection Scorecard
+
+The project now includes a constraint-aware scorecard that turns benchmark results into explicit backend choices. It uses hard constraints plus profile-specific weighted scoring across text LLM, local CV, and remote VLM candidates.
+
+Scorecard files:
+
+- [docs/model_selection_scorecard.md](docs/model_selection_scorecard.md)
+- [configs/model_selection_profiles.yaml](configs/model_selection_profiles.yaml)
+- [results/raw/model_selection_candidates.csv](results/raw/model_selection_candidates.csv)
+- [results/raw/model_selection_scores.csv](results/raw/model_selection_scores.csv)
+
+Run:
+
+```bash
+python3 scripts/score_model_candidates.py \
+  --candidates results/raw/model_selection_candidates.csv \
+  --profiles configs/model_selection_profiles.yaml \
+  --out results/raw/model_selection_scores.csv
+```
+
+Current profile recommendations:
+
+| Profile | Recommended backend |
+|---|---|
+| `text_local_default` | Qwen3.5 0.8B `Q4_K_M` on Jetson |
+| `text_quality_fallback` | Qwen3.5 4B `Q4_K_M` on RTX, with 4B `Q8_0` as the heavier conservative alternative |
+| `vision_local_fast_path` | YOLOv8n TensorRT FP16 on Jetson |
+| `vision_remote_semantic_backend` | Gemma 4 E2B-it `Q4_K_M` + `mmproj-F16` remote VLM |
+
 ## Project 2: Edge LLM Task Router
 
 Project 2 turns the benchmark decisions into a Jetson-first routing service. The gateway analyzes each request and decides whether it should run locally on Jetson, go to a remote RTX backend, or be rejected/degraded. The MVP uses a mock backend by default and includes an optional `llama.cpp` backend adapter.
