@@ -1,92 +1,82 @@
 # Serving Reliability Report
 
-## Engineering Goal
+## Scope
 
-Project 2 v0.4 upgrades the router from a working heterogeneous demo into a more reliable serving prototype. The goal is not production concurrency. The goal is clear behavior when the Jetson local backend is busy, hot, unavailable, or when the RTX remote backend is unavailable.
+v0.7-minimal is a prototype-level reliability benchmark for the vision router. It does not change the text router, does not start a real remote VLM, and does not introduce new models. The goal is to check whether the Jetson-first gateway has explainable behavior under concurrency, local queue pressure, backend unavailability, privacy constraints, and timeout-like failures.
 
-## What Changed
+## What Is Covered
 
-- The gateway now tracks real in-process local and remote inflight requests.
-- `/health` returns `local_queue_depth` and `remote_queue_depth`.
-- The routing policy uses local queue depth and Jetson temperature to reduce local routing pressure.
-- Privacy-sensitive requests reject instead of leaving Jetson when local execution is unavailable, overloaded, or thermally unsafe.
-- Remote-required tasks reject when RTX is unavailable, instead of silently degrading to the smaller Jetson model.
-- `/state` and `/state/reset` allow failure-mode smoke tests to simulate backend availability, queue pressure, and temperature.
+- local detect/classify through the v0.6 YOLOv8n TensorRT FP16 backend
+- remote scene description / VQA through a mock remote VLM path
+- privacy `local_only` semantic vision rejection
+- local queue overload fallback or rejection
+- local backend unavailable
+- remote backend unavailable
+- impossible latency budget rejection
+- timeout case using a simulated slow remote backend
 
-## Why This Matters
+## How To Run
 
-Without queue and failure behavior, a router can look correct in a single-request smoke test while failing badly under real serving conditions. Edge devices are especially sensitive to overload because local memory, thermals, and power headroom are limited. v0.4 makes the policy explain when it routes remote, when it keeps work local, and when it rejects.
-
-## Expected Validation
-
-Run these checks after starting:
-
-- Jetson local `llama-server` on `127.0.0.1:8080`
-- RTX remote `llama-server` on WSL `127.0.0.1:8081`
-- SSH reverse tunnel from Jetson `127.0.0.1:18081` to RTX/WSL `127.0.0.1:8081`
-- Jetson gateway using `serving/configs_dual_llamacpp`
-
-Commands:
+Run on Jetson from the project root:
 
 ```bash
-python3 serving/scripts/smoke_dual_real_backends.py --url http://127.0.0.1:8000
-python3 serving/scripts/load_test_dual_real_backends.py --url http://127.0.0.1:8000 --concurrency 4 --requests 40
-python3 serving/scripts/summarize_serving_load_test.py serving/results/raw/dual_real_backend_load_test.csv
-python3 serving/scripts/smoke_failure_modes.py --url http://127.0.0.1:8000
+env LD_LIBRARY_PATH=/usr/lib/aarch64-linux-gnu/nvidia:/usr/local/cuda/targets/aarch64-linux/lib \
+  python3 serving/scripts/reliability_benchmark.py \
+  --mode vision \
+  --concurrency 1,2,4,8 \
+  --requests 20 \
+  --sample-image results/figures/camera_v05_positive_detection.jpg \
+  --engine-path /home/rainbow/models/vision/yolo_nano/yolov8n_fp16.engine
 ```
 
-Expected output files:
+Outputs:
 
-- `serving/results/raw/dual_real_backend_load_test.csv`
-- `serving/results/raw/dual_real_backend_load_test_summary.csv`
-- `serving/results/raw/failure_modes_smoke.csv`
+- `serving/results/raw/reliability_benchmark.csv`
+- `serving/results/raw/reliability_failure_modes.csv`
+- `serving/results/raw/reliability_summary.csv`
 
 ## Results
 
-v0.4 was validated on the same dual-backend setup as v0.3:
+The benchmark runs 20 requests at each concurrency level: `1`, `2`, `4`, and `8`. The workload mixes local CV, remote mock VLM, privacy rejection, and impossible-latency rejection. Failure modes are recorded separately.
 
-- Jetson local Qwen3.5 0.8B Q4_K_M `llama-server`
-- RTX 5090 / WSL remote Qwen3.5 4B Q4_K_M `llama-server`
-- SSH reverse tunnel from Jetson `127.0.0.1:18081` to RTX/WSL `127.0.0.1:8081`
-- Jetson gateway using `serving/configs_dual_llamacpp`
+Current summary:
 
-Regression smoke:
+| Concurrency | Requests | Success | Reject | Backend error | Timeout | Fallback | Local | Remote | P50 ms | P95 ms | P99 ms | Pass rate |
+|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| 1 | 20 | 14 | 6 | 0 | 0 | 0 | 8 | 6 | 1.10 | 42.77 | 269.55 | 1.00 |
+| 2 | 20 | 14 | 6 | 0 | 0 | 0 | 8 | 6 | 1.19 | 76.51 | 97.99 | 1.00 |
+| 4 | 20 | 14 | 6 | 0 | 0 | 6 | 2 | 12 | 1.07 | 29.68 | 52.29 | 1.00 |
+| 8 | 20 | 14 | 6 | 0 | 0 | 6 | 2 | 12 | 1.07 | 28.00 | 47.96 | 1.00 |
 
-- output: `serving/results/raw/dual_real_backend_smoke_v04_regression.csv`
-- requests: 11
-- route match: 11/11
-- local real success: 4/4
-- remote real success: 6/6
-- reject: 1/1
+Failure-mode summary:
 
-Failure-mode smoke:
+| Scenario | Expected behavior | Result |
+|---|---|---|
+| normal local detect | local success | pass |
+| normal remote scene | remote success | pass |
+| privacy local-only VQA | reject | pass |
+| local backend unavailable | reject for local-only | pass |
+| remote backend unavailable | reject | pass |
+| local queue overloaded, allow_remote | remote fallback | pass |
+| local queue overloaded, local_only | reject | pass |
+| impossible latency budget | reject | pass |
+| timeout | timeout/backend error | pass |
 
-- output: `serving/results/raw/failure_modes_smoke.csv`
-- cases: 6
-- route match: 6/6
-- unexpected errors: 0
-- covered: remote unavailable, local unavailable, local queue overloaded, high temperature, privacy local-only with local unavailable, and privacy local-only with local queue overload
+The full CSVs are:
 
-Concurrent load test:
+- `serving/results/raw/reliability_benchmark.csv`
+- `serving/results/raw/reliability_failure_modes.csv`
+- `serving/results/raw/reliability_summary.csv`
 
-- output: `serving/results/raw/dual_real_backend_load_test.csv`
-- summary: `serving/results/raw/dual_real_backend_load_test_summary.csv`
-- requests: 40
-- concurrency: 4
-- success count: 35
-- reject count: 5
-- backend errors: 0
-- timeouts: 0
-- route match rate: 1.0
-- route distribution: local 18, remote 17, reject 5
-- local latency: P50 2613.36 ms, P95 2852.85 ms, P99 2853.24 ms
-- remote latency: P50 705.55 ms, P95 1233.71 ms, P99 1497.67 ms
-- total latency: P50 1233.71 ms, P95 2793.71 ms, P99 2853.24 ms
+## Engineering Interpretation
 
-## Current Limitations
+This benchmark is intentionally small. It proves routing reliability behavior rather than production throughput. Queue depth is in-process state inside the benchmark harness, not a distributed queue. At concurrency `4` and `8`, local queue pressure redirects six allow-remote local-CV requests to the remote mock path; privacy-sensitive requests still reject instead of leaving Jetson. The remote backend is a mock because v0.7 focuses on policy behavior; v0.5b already validated the real RTX VLM path.
 
-- Queue depth is per gateway process, not shared across multiple processes.
-- Temperature is simulated through `/state`; a real `tegrastats` parser is still future work.
-- There is no explicit degrade-to-local policy for remote-required tasks.
-- No streaming cancellation or retry budget yet.
-- The SSH reverse tunnel is acceptable for the lab setup, but production would use a stable network path or service discovery.
+## Limitations
+
+- in-process queue only
+- no distributed queue or Kubernetes/autoscaling
+- no Prometheus or production observability stack
+- remote VLM in this benchmark is mock
+- timeout is simulated rather than caused by the real remote VLM server
+- no streaming cancellation or retry budget

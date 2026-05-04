@@ -360,6 +360,14 @@ Current v0.6 result:
 - `fallback_used=false` for all rows
 - remote rows are intentionally mock in this v0.6 smoke; the real remote VLM path was already validated in v0.5b
 
+v0.7-minimal adds a small reliability benchmark for the vision router without changing the text router or starting a real remote VLM. It uses YOLO TensorRT local CV plus a mock remote path to cover queue pressure, fallback, reject, backend-unavailable, and timeout behavior.
+
+- report: [serving/docs/reliability_report.md](serving/docs/reliability_report.md)
+- benchmark CSV: [serving/results/raw/reliability_benchmark.csv](serving/results/raw/reliability_benchmark.csv)
+- failure modes CSV: [serving/results/raw/reliability_failure_modes.csv](serving/results/raw/reliability_failure_modes.csv)
+- summary CSV: [serving/results/raw/reliability_summary.csv](serving/results/raw/reliability_summary.csv)
+- result: `80` benchmark requests across concurrency `1/2/4/8`, pass rate `1.0` for every concurrency level, and `9/9` failure modes passed
+
 ## Project 3: Local CV ONNX / TensorRT Optimization
 
 Project 3 starts from the v0.5 local CV path and measures runtime choices for Jetson deployment. MobileNet-SSD Caffe through OpenCV DNN remains the v0.5 router baseline. Phase 1 used SSD-MobileNetV1 ONNX for ONNXRuntime feasibility, Phase 1.5 fixed ONNXRuntime session lifecycle overhead, and Phase 2 switches the TensorRT optimization object to YOLOv8n because SSD-MobileNetV1 ONNX hits a TensorRT 10.3 graph compatibility blocker.
