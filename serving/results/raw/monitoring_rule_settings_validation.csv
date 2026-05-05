@@ -1,0 +1,6 @@
+case,expected,validation,status
+default_rule,Initial active rule is person with threshold 0.30,get_default_monitoring_rule_config returns person and 0.30,pass
+stable_widget_keys,Rule widgets use fixed Streamlit keys,app.py defines RULE_WIDGET_KEYS,pass
+save_rule,Edited widget values are copied into monitoring_rule_config,Save Rule calls read_rule_widgets and updates session_state,pass
+capture_uses_saved_rule,Capture Once and Start Monitoring use saved active rule only,_run_live_monitor_capture receives active_rule values not raw widget draft values,pass
+reset_rule,Reset restores defaults and clears persistence/cooldown state,Reset to Default updates monitoring_rule_config and monitoring_rule_state,pass

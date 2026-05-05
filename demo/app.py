@@ -33,10 +33,57 @@ st.set_page_config(
 
 
 DEFAULT_GATEWAY_URL = "http://192.168.1.102:8000"
+RULE_WIDGET_KEYS = {
+    "enabled": "rule_enabled",
+    "watch_label": "rule_watch_label",
+    "confidence_threshold": "rule_confidence_threshold",
+    "persistence_frames": "rule_persistence_frames",
+    "cooldown_seconds": "rule_cooldown_seconds",
+    "require_vlm_confirmation": "rule_require_vlm_confirmation",
+    "privacy": "rule_privacy",
+    "vlm_prompt": "rule_vlm_prompt",
+}
 
 
 def default_gateway_url() -> str:
     return os.environ.get("EDGE_GATEWAY_URL", DEFAULT_GATEWAY_URL)
+
+
+def get_default_monitoring_rule_config() -> dict[str, Any]:
+    return {
+        "enabled": True,
+        "watch_label": "person",
+        "confidence_threshold": 0.30,
+        "persistence_frames": 1,
+        "cooldown_seconds": 10,
+        "require_vlm_confirmation": False,
+        "privacy": "allow_remote",
+        "vlm_prompt": "Does this image contain the watched object? Answer JSON only.",
+    }
+
+
+def ensure_monitoring_rule_config() -> dict[str, Any]:
+    if "monitoring_rule_config" not in st.session_state:
+        st.session_state["monitoring_rule_config"] = get_default_monitoring_rule_config()
+    return st.session_state["monitoring_rule_config"]
+
+
+def sync_rule_widgets_from_config(config: dict[str, Any]) -> None:
+    for field, widget_key in RULE_WIDGET_KEYS.items():
+        st.session_state[widget_key] = config[field]
+
+
+def read_rule_widgets() -> dict[str, Any]:
+    config = get_default_monitoring_rule_config()
+    for field, widget_key in RULE_WIDGET_KEYS.items():
+        if widget_key in st.session_state:
+            config[field] = st.session_state[widget_key]
+    config["confidence_threshold"] = float(config["confidence_threshold"])
+    config["persistence_frames"] = int(config["persistence_frames"])
+    config["cooldown_seconds"] = int(config["cooldown_seconds"])
+    config["enabled"] = bool(config["enabled"])
+    config["require_vlm_confirmation"] = bool(config["require_vlm_confirmation"])
+    return config
 
 
 def mode_label(use_sample_mode: bool) -> str:
@@ -313,6 +360,7 @@ def _display_final_answer(result: dict[str, Any]) -> None:
 
 
 def render_header() -> tuple[bool, str]:
+    ensure_monitoring_rule_config()
     st.title("Jetson Local-First Monitoring Gateway")
     st.caption(
         "A local-first edge monitoring workbench that uses Jetson for low-latency local detection "
@@ -542,18 +590,51 @@ def render_live_monitor(use_sample_mode: bool, api_base_url: str) -> None:
                 key="live_tokens",
             )
         with st.expander("Event trigger rule"):
-            rule_enabled = st.checkbox("Enable candidate event trigger", value=True)
-            watch_label = st.text_input("Watch label", value="person")
-            confidence_threshold = st.slider("Confidence threshold", min_value=0.0, max_value=1.0, value=0.30, step=0.05)
-            persistence_frames = st.number_input("Persistence frames", min_value=1, max_value=10, value=1, step=1)
-            cooldown_seconds = st.number_input("Cooldown seconds", min_value=0, max_value=300, value=10, step=5)
-            require_vlm_confirmation = st.checkbox("Require VLM confirmation", value=False)
-            rule_privacy = st.radio("Review privacy", ["allow_remote", "local_only"], horizontal=True)
-            vlm_prompt = st.text_area(
-                "VLM confirmation prompt",
-                value="Does this image contain the watched object? Answer JSON only.",
-                height=80,
+            active_rule = ensure_monitoring_rule_config()
+            if st.session_state.pop("rule_sync_widgets", False) or any(
+                key not in st.session_state for key in RULE_WIDGET_KEYS.values()
+            ):
+                sync_rule_widgets_from_config(active_rule)
+            if st.session_state.get("rule_status_message"):
+                st.success(st.session_state.pop("rule_status_message"))
+            st.caption(
+                "Edit values, then click Save Rule to apply them to monitoring. "
+                "Current active rule is used for Capture Once and Start Monitoring."
             )
+            st.info(
+                "Current active rule: "
+                f"label={active_rule['watch_label']}, "
+                f"confidence>={active_rule['confidence_threshold']:.2f}, "
+                f"VLM confirmation={active_rule['require_vlm_confirmation']}, "
+                f"privacy={active_rule['privacy']}."
+            )
+            st.checkbox("Enable candidate event trigger", key="rule_enabled")
+            st.text_input("Watch label", key="rule_watch_label")
+            st.slider("Confidence threshold", min_value=0.0, max_value=1.0, step=0.05, key="rule_confidence_threshold")
+            st.number_input("Persistence frames", min_value=1, max_value=10, step=1, key="rule_persistence_frames")
+            st.number_input("Cooldown seconds", min_value=0, max_value=300, step=5, key="rule_cooldown_seconds")
+            st.checkbox("Require VLM confirmation", key="rule_require_vlm_confirmation")
+            st.radio("Review privacy", ["allow_remote", "local_only"], horizontal=True, key="rule_privacy")
+            st.text_area(
+                "VLM confirmation prompt",
+                height=80,
+                key="rule_vlm_prompt",
+            )
+            rule_action_cols = st.columns(2)
+            with rule_action_cols[0]:
+                if st.button("Save Rule"):
+                    st.session_state["monitoring_rule_config"] = read_rule_widgets()
+                    st.session_state["rule_status_message"] = "Rule saved"
+                    st.rerun()
+            with rule_action_cols[1]:
+                if st.button("Reset to Default"):
+                    default_rule = get_default_monitoring_rule_config()
+                    st.session_state["monitoring_rule_config"] = default_rule
+                    st.session_state["rule_sync_widgets"] = True
+                    st.session_state["monitoring_rule_state"] = {}
+                    st.session_state["last_detection_signature"] = None
+                    st.session_state["rule_status_message"] = "Rule reset to default"
+                    st.rerun()
             user_save = st.checkbox("Save this snapshot as event", value=False)
 
     def capture() -> None:
@@ -567,14 +648,14 @@ def render_live_monitor(use_sample_mode: bool, api_base_url: str) -> None:
             quality=quality,
             latency_budget_ms=int(latency_budget_ms),
             max_tokens=int(max_tokens),
-            rule_enabled=rule_enabled,
-            watch_label=watch_label,
-            confidence_threshold=float(confidence_threshold),
-            persistence_frames=int(persistence_frames),
-            cooldown_seconds=float(cooldown_seconds),
-            require_vlm_confirmation=bool(require_vlm_confirmation),
-            rule_privacy=rule_privacy,
-            vlm_prompt=vlm_prompt,
+            rule_enabled=bool(active_rule["enabled"]),
+            watch_label=str(active_rule["watch_label"]),
+            confidence_threshold=float(active_rule["confidence_threshold"]),
+            persistence_frames=int(active_rule["persistence_frames"]),
+            cooldown_seconds=float(active_rule["cooldown_seconds"]),
+            require_vlm_confirmation=bool(active_rule["require_vlm_confirmation"]),
+            rule_privacy=str(active_rule["privacy"]),
+            vlm_prompt=str(active_rule["vlm_prompt"]),
             user_save=user_save,
         )
 
