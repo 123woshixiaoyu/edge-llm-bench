@@ -91,7 +91,7 @@ Source: [serving/docs/project3_tensorrt_report.md](serving/docs/project3_tensorr
 | v0.8 remote VLM profiling | Gemma VLM subprocess latency is measured and reduced with resize/prompt defaults | About 19.0 s baseline to about 16.7-17.2 s recommended config |
 | Fast VLM verifier benchmark | Compact SmolVLM2 models are tested as faster event-level semantic verifiers | Sub-second RTX latency, but 0/36 valid JSON responses, so not a drop-in structured verifier |
 | SmolVLM2 output robustness | Simpler output protocols are tested for machine-parseable event verification | `final_line` protocol makes SmolVLM2-256M a narrow fast-verifier candidate, but not a YOLO/Gemma replacement |
-| YOLO-World trigger benchmark | Open-vocabulary detector is evaluated as a future custom-object trigger path | RTX detects common prompts in ~14-17 ms total; Jetson smoke still pending |
+| YOLO-World trigger benchmark | Open-vocabulary detector is evaluated as a future custom-object trigger path | RTX detects common prompts in ~14-17 ms total; Jetson smoke is dependency-blocked without altering the working Gateway/TensorRT stack |
 | v0.9 Monitoring Workbench | Browser UI productizes the gateway into Live Monitor, Event Review, Monitoring Assistant, Event History, System Status, and Model Policy | Real mode calls Jetson Gateway; JSONL history records detections, reviews, rejects, assistant summaries, and event-triggered VLM review status |
 
 Source: [serving/docs/reliability_report.md](serving/docs/reliability_report.md)

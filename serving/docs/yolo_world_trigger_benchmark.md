@@ -8,7 +8,7 @@ This benchmark evaluates YOLO-World as a possible **custom-object trigger detect
 
 ## Setup
 
-Runtime:
+RTX runtime:
 
 - Platform tested: RTX 5090 Laptop / WSL
 - Evaluation environment: existing isolated `.venv-vlm`
@@ -41,6 +41,15 @@ Artifacts:
 - `serving/results/raw/yolo_world_summary.csv`
 
 No `.pt`, `.onnx`, `.engine`, cache, or runtime logs are committed.
+
+Jetson follow-up:
+
+- Platform checked: Jetson Orin Nano 8GB
+- Project path: `/home/rainbow/edge-llm-bench`
+- Model evaluated: `yolov8s-worldv2.pt`
+- Result status: `dependency_blocked`
+
+The Jetson check synced only the benchmark script, committed public sample images, and the already-downloaded YOLO-World small weight into Jetson runtime storage. It did not modify the Gateway, YOLOv8n TensorRT engine, router policy, or active services.
 
 ## Class Sets
 
@@ -76,13 +85,25 @@ TensorRT export was **not** attempted in this pass. The main reason is scope con
 
 ## Jetson Smoke
 
-Jetson smoke was not run in this pass. SSH BatchMode access failed with:
+Manual SSH to the Jetson was confirmed and the Jetson-only smoke was attempted. The runtime did not have the required Python dependencies:
 
 ```text
-Permission denied (publickey,password)
+python 3.10.12 /usr/bin/python3
+torch_error ModuleNotFoundError No module named 'torch'
+ultralytics_error ModuleNotFoundError No module named 'ultralytics'
+cv2 4.13.0
 ```
 
-I did not install Ultralytics or modify the Jetson runtime environment. This keeps the existing Gateway / YOLO TensorRT stack untouched.
+Creating an isolated Jetson virtual environment with `python3 -m venv .venv-yolo-world` also failed because the Jetson image does not currently include `ensurepip` / `python3.10-venv`. I did not install `python3.10-venv` with apt because this phase is benchmark-only and should not alter the working Gateway/TensorRT environment.
+
+I checked a user-level pip dry run for `ultralytics`. It would pull a large new stack including `torch 2.11.0`, `torchvision 0.26.0`, CUDA 13 toolkit packages, cuDNN, cuBLAS, cuFFT, cuSOLVER, cuSPARSE, NCCL, NVSHMEM, and Triton. That is too invasive for a Jetson smoke whose explicit goal is not to disturb the existing YOLOv8n TensorRT and Gateway setup.
+
+The Jetson rows were therefore generated as explicit `dependency_blocked` records in:
+
+- `serving/results/raw/yolo_world_benchmark.csv`
+- `serving/results/raw/yolo_world_summary.csv`
+
+This is an environment blocker, not evidence that YOLO-World cannot run on Jetson.
 
 ## Engineering Interpretation
 
@@ -96,10 +117,10 @@ I did not install Ultralytics or modify the Jetson runtime environment. This kee
    It produced a hit for `object inside bowl`, but this should be treated as a weak detector cue, not reliable relation reasoning. Relationship triggers still need ROI/change logic or a VLM verifier.
 
 4. **Can it replace YOLOv8n TensorRT as the default local detector?**  
-   Not yet. The current YOLOv8n TensorRT path is proven on Jetson at roughly `10-30 ms` inference and is already integrated. YOLO-World needs Jetson latency and TensorRT validation before it can be considered as a replacement.
+   No. The current YOLOv8n TensorRT path is proven on Jetson at roughly `10-30 ms` inference and is already integrated. YOLO-World is blocked on Jetson dependency/runtime setup in this pass and still needs Jetson latency plus TensorRT validation before it can be considered as a replacement.
 
 5. **Is it useful as a custom-object trigger backend?**  
-   Potentially yes. The RTX result shows very low latency and successful open-vocabulary operation. Its best role is likely a lower-frequency custom-object trigger path, not the every-frame default.
+   Potentially yes, but currently as an RTX-proven candidate only. The RTX result shows very low latency and successful open-vocabulary operation. Its best role is likely a lower-frequency custom-object trigger path, not the every-frame Jetson default.
 
 6. **Can it reduce VLM calls?**  
    Yes, if validated on a target object set. YOLO-World can provide boxes/confidence for custom prompts, so it is a better trigger detector than asking a VLM every frame. VLM should remain the semantic verifier for event review and relation-heavy questions.
@@ -124,8 +145,8 @@ Gemma remote VLM
 
 Before integration, run:
 
-1. Jetson smoke with `yolov8s-worldv2.pt`.
-2. Custom-object image test with non-private public examples containing lipstick / tool / package.
-3. Jetson ONNXRuntime or TensorRT export benchmark.
-4. False-positive check for relation prompts.
-
+1. Prepare a controlled Jetson YOLO-World runtime, preferably a separate container or vetted Jetson-compatible PyTorch/Ultralytics environment.
+2. Re-run Jetson smoke with `yolov8s-worldv2.pt`.
+3. Test custom-object images with non-private public examples containing lipstick / tool / package.
+4. Run Jetson ONNXRuntime or TensorRT export benchmark from the already-successful ONNX export path.
+5. Check false positives for relation prompts.
