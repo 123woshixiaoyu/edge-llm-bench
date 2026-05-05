@@ -99,6 +99,16 @@ runtime_data/events/images/
 
 This directory is intentionally ignored by git. Each event records source, task type, privacy, route, backend, local CV labels, latency, final answer text, reasons, errors, and mode. It is a lightweight product loop, not a production database.
 
+Auto refresh does not save every frame as a long-term event. Ordinary refreshes only overwrite `runtime_data/events/latest_snapshot.jpg`; alerts, trigger matches, VLM reviews, rejects, backend errors/fallbacks, assistant summaries, and user-saved snapshots are retained. Saved events include retention metadata such as whether an image was stored, whether the frame was sent to the remote workstation, and when the record expires.
+
+Default storage policy:
+
+- max events: `500`
+- max retained images: `512 MB`
+- retention window: `7 days`
+
+Override with `MONITORING_MAX_EVENTS`, `MONITORING_MAX_IMAGES_MB`, and `MONITORING_RETENTION_DAYS`. See [../docs/storage_retention_policy.md](../docs/storage_retention_policy.md).
+
 ## Real Mode Services
 
 Use `serving/configs_interactive_demo` for the Jetson Gateway. Expected runtime services:

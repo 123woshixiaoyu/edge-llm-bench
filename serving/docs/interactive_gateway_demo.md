@@ -197,6 +197,12 @@ runtime_data/events/images/
 
 This is the minimum product loop. It is not SQLite, a search system, or a production audit database.
 
+The store has a lightweight retention policy. Ordinary auto-refresh frames are not written to long-term history; they only overwrite `runtime_data/events/latest_snapshot.jpg`. Events are retained for user saves, trigger matches, local alerts, VLM reviews, privacy rejects, backend errors/fallbacks, and assistant summaries.
+
+Default limits are `500` events, `512 MB` of retained event images, and `7` days. They can be overridden with `MONITORING_MAX_EVENTS`, `MONITORING_MAX_IMAGES_MB`, and `MONITORING_RETENTION_DAYS`. Cleanup runs after event append/update, removes unreferenced images, and marks events with `image_missing=true` if an old image is deleted while metadata remains. See [../../docs/storage_retention_policy.md](../../docs/storage_retention_policy.md).
+
+Remote semantic review is explicit. The Event Review tab warns when a frame may be sent to the RTX workstation, and privacy-safe rejects are recorded with `sent_to_remote=false`.
+
 ## Smoke Test
 
 Run:

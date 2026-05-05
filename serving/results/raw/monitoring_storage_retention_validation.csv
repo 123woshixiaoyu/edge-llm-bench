@@ -1,0 +1,8 @@
+case,expected,actual,status
+ordinary_auto_refresh,metadata not persisted and latest snapshot overwritten,stored_event=false and events log remains empty,pass
+trigger_event,trigger match saves event and image,stored_event=true stored_image=true,pass
+remote_vlm_review,remote review event records remote transfer,sent_to_remote=true,pass
+privacy_reject,privacy-safe reject saves metadata without remote transfer,sent_to_remote=false stored_image=false,pass
+max_events_limit,MONITORING_MAX_EVENTS=3 keeps newest three events,load_recent_events returns 3,pass
+image_budget_limit,MONITORING_MAX_IMAGES_MB=0 removes old event image and marks metadata,image_missing=true stored_image=false,pass
+latest_snapshot,cleanup does not delete latest snapshot,latest_snapshot.jpg remains present,pass

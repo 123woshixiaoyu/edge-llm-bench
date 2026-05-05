@@ -11,7 +11,7 @@ from typing import Any
 
 import streamlit as st
 
-from event_store import append_event, load_recent_events, summarize_recent_events, update_event
+from event_store import append_event, get_storage_policy, load_recent_events, summarize_recent_events, update_event
 from monitoring_rules import MonitoringRule, detection_signature, evaluate_rule
 from output_validation import structured_vlm_prompt
 from sample_results import (
@@ -97,6 +97,11 @@ def _event_from_result(
         "local_cv_latency_ms": _as_float(result.get("local_cv_inference_latency_ms")),
         "remote_latency_ms": _as_float(result.get("remote_latency_ms")),
         "total_latency_ms": _as_float(result.get("total_latency_ms")),
+        "sent_to_remote": result.get("sent_to_remote"),
+        "remote_backend": result.get("remote_backend")
+        or (result.get("selected_backend") if result.get("route") == "remote" else ""),
+        "alert": result.get("alert"),
+        "user_save": result.get("user_save"),
         "final_answer_text": result.get("final_answer_text")
         or result.get("full_response")
         or result.get("response_preview")
@@ -117,7 +122,9 @@ def _record_event(
     privacy: str,
     prompt: str = "",
     image_source: Any = None,
+    user_save: bool = False,
 ) -> dict[str, Any]:
+    result["user_save"] = user_save
     event = append_event(
         _event_from_result(
             source=source,
@@ -128,9 +135,12 @@ def _record_event(
         ),
         image_source=image_source,
     )
-    st.session_state["latest_event"] = event
+    if event.get("stored_event"):
+        st.session_state["latest_event"] = event
     if event.get("image_path"):
         st.session_state["latest_image_path"] = event["image_path"]
+    elif event.get("latest_snapshot_path"):
+        st.session_state["latest_image_path"] = event["latest_snapshot_path"]
     return event
 
 
@@ -184,6 +194,8 @@ def _ensure_review_worker(api_base_url: str) -> queue.Queue:
                         "reasons": result.get("reasons", []),
                         "error": result.get("error", ""),
                         "selected_backend": result.get("selected_backend"),
+                        "sent_to_remote": result.get("route") == "remote",
+                        "remote_backend": result.get("selected_backend") if result.get("route") == "remote" else "",
                         "status": status,
                         "mode": result.get("mode"),
                     },
@@ -317,6 +329,10 @@ def render_header() -> tuple[bool, str]:
 def render_live_monitor(use_sample_mode: bool, api_base_url: str) -> None:
     st.subheader("Live Monitor")
     st.write("Capture snapshots and run the local Jetson YOLO TensorRT monitoring fast path.")
+    st.caption(
+        "Auto refresh does not save every frame. Only alerts, triggered events, reviews, rejects, "
+        "backend errors/fallbacks, and user-saved events are retained."
+    )
     if "vlm_review_queue" in st.session_state:
         st.caption(f"VLM review pending: {st.session_state['vlm_review_queue'].qsize()}")
 
@@ -374,6 +390,7 @@ def render_live_monitor(use_sample_mode: bool, api_base_url: str) -> None:
                 value="Does this image contain the watched object? Answer JSON only.",
                 height=80,
             )
+            user_save = st.checkbox("Save this snapshot as event", value=False)
 
     manual_capture = st.button("Capture Snapshot / Run Local Detection", type="primary")
     should_capture = manual_capture or st.session_state.get("live_auto_refresh", False)
@@ -430,11 +447,13 @@ def render_live_monitor(use_sample_mode: bool, api_base_url: str) -> None:
             st.warning("Candidate Event: trigger matched local detection rule.")
             if require_vlm_confirmation and rule_privacy == "allow_remote":
                 result["vlm_review_status"] = "queued"
+                result["sent_to_remote"] = True
                 result["final_answer_text"] = "Candidate event queued for workstation VLM review."
             elif require_vlm_confirmation and rule_privacy == "local_only":
                 result["vlm_review_status"] = "failed"
                 result["route"] = "reject"
                 result["status"] = "privacy_blocked"
+                result["sent_to_remote"] = False
                 result["final_answer_text"] = (
                     "Privacy Blocked: semantic review would require sending the image to the remote workstation."
                 )
@@ -444,8 +463,11 @@ def render_live_monitor(use_sample_mode: bool, api_base_url: str) -> None:
                 ]
             else:
                 result["status"] = "local_alert"
+                result["alert"] = True
+                result["sent_to_remote"] = False
                 result["final_answer_text"] = "Local alert generated from YOLO TensorRT detection rule."
         else:
+            result["sent_to_remote"] = False
             st.caption(f"No candidate event triggered: {rule_result['reason']}")
 
         _display_local_precheck(result, image_for_display, "Current snapshot with local YOLO monitoring boxes")
@@ -458,6 +480,7 @@ def render_live_monitor(use_sample_mode: bool, api_base_url: str) -> None:
             task_type=task_type,
             privacy=privacy,
             image_source=_image_source_for_event(result, image_payload or str(SAMPLE_IMAGE)),
+            user_save=user_save,
         )
         if rule_result["trigger_matched"] and require_vlm_confirmation and rule_privacy == "allow_remote":
             if event.get("image_path"):
@@ -480,7 +503,10 @@ def render_live_monitor(use_sample_mode: bool, api_base_url: str) -> None:
                         "error": "candidate event image was not available for VLM review",
                     },
                 )
-        st.caption(f"Recorded event {event['event_id']} in Event History.")
+        if event.get("stored_event"):
+            st.caption(f"Recorded event {event['event_id']} in Event History.")
+        else:
+            st.caption("Updated latest snapshot only; this ordinary refresh was not retained as a long-term event.")
 
     if st.session_state.get("live_auto_refresh", False):
         time.sleep(float(interval_s))
@@ -533,6 +559,7 @@ def render_event_review(use_sample_mode: bool, api_base_url: str) -> None:
         )
         if privacy == "allow_remote":
             st.caption("Send to RTX workstation when semantic review is required.")
+            st.info("This image may be sent to the RTX workstation for semantic review.")
         else:
             st.caption("Privacy-safe mode blocks semantic vision offload.")
 
@@ -557,12 +584,15 @@ def render_event_review(use_sample_mode: bool, api_base_url: str) -> None:
             image_for_display = _image_for_result(result, image_payload or str(SAMPLE_IMAGE))
 
         if privacy == "local_only" and result.get("route") == "reject":
+            result["sent_to_remote"] = False
             st.warning(
                 "Blocked by privacy policy: semantic vision would require sending the image "
                 "to the remote workstation."
             )
         elif result.get("mode") == "sample fallback":
             st.warning("Real backend unavailable; showing committed sample fallback.")
+        else:
+            result["sent_to_remote"] = result.get("route") == "remote"
 
         _display_local_precheck(result, image_for_display, "Event snapshot with local YOLO precheck boxes")
         _display_routing_decision(result)
@@ -650,6 +680,13 @@ def render_monitoring_assistant(use_sample_mode: bool, api_base_url: str) -> Non
 def render_event_history() -> None:
     st.subheader("Event History")
     st.write("Recent detection, review, reject, and assistant events are stored locally as JSONL.")
+    policy = get_storage_policy()
+    st.caption(
+        "Storage policy: "
+        f"max_events={policy.max_events}, max_images_mb={policy.max_images_mb}, "
+        f"retention_days={policy.retention_days}. "
+        "Latest ordinary snapshot is overwritten instead of retained forever."
+    )
     route_filter = st.selectbox("Route filter", ["all", "local", "remote", "reject"], index=0)
     limit = st.number_input("Events to show", min_value=5, max_value=100, value=25, step=5)
     events = load_recent_events(limit=int(limit), route_filter=route_filter)
@@ -668,6 +705,11 @@ def render_event_history() -> None:
             "vlm_review_status": event.get("vlm_review_status"),
             "selected_backend": event.get("selected_backend"),
             "latency_ms": event.get("total_latency_ms"),
+            "image": "expired"
+            if event.get("image_missing")
+            else ("stored" if event.get("stored_image") else "metadata only"),
+            "remote": "sent to RTX" if event.get("sent_to_remote") else "local only",
+            "expires_at": event.get("retention_expires_at"),
             "error": event.get("error"),
         }
         for event in events
@@ -678,8 +720,18 @@ def render_event_history() -> None:
         title = f"{event.get('timestamp', '')} | {event.get('source', '')} | {event.get('route', '')}"
         with st.expander(title):
             image_path = event.get("image_path")
-            if image_path and Path(image_path).exists():
+            if event.get("image_missing"):
+                st.info("Image expired by retention policy.")
+            elif image_path and Path(image_path).exists():
                 st.image(image_path, caption="Recorded event image", use_container_width=True)
+            else:
+                st.caption("Metadata-only event; no retained image is attached.")
+            st.write(
+                "Storage: "
+                f"{'image stored' if event.get('stored_image') else 'metadata only'} | "
+                f"{'sent to remote workstation' if event.get('sent_to_remote') else 'local only'} | "
+                f"expires at {event.get('retention_expires_at', 'n/a')}"
+            )
             st.json(event)
 
 

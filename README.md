@@ -137,6 +137,7 @@ Main entry points:
 - Monitoring Workbench: `streamlit run demo/app.py` or `python3 demo/run_interactive_stack.py --with-ui`
 - Monitoring Workbench real-mode validation: [docs/monitoring_workbench_real_mode_validation.md](docs/monitoring_workbench_real_mode_validation.md)
 - Event-triggered monitoring validation: [docs/monitoring_workbench_event_trigger_validation.md](docs/monitoring_workbench_event_trigger_validation.md)
+- Monitoring storage retention policy: [docs/storage_retention_policy.md](docs/storage_retention_policy.md)
 - Interactive gateway smoke: `python3 serving/scripts/smoke_interactive_gateway.py --url http://127.0.0.1:8000`
 - Interactive demo notes: [serving/docs/interactive_gateway_demo.md](serving/docs/interactive_gateway_demo.md)
 - Setup notes: [docs/setup_requirements.md](docs/setup_requirements.md)
@@ -150,6 +151,8 @@ Runtime assets are intentionally outside git:
 - calibration images/caches
 - runtime workbench history under `runtime_data/`
 
+The workbench does not retain every auto-refresh frame. Ordinary frames overwrite the latest snapshot, while alerts, trigger matches, reviews, rejects, backend errors/fallbacks, assistant summaries, and user-saved events follow the retention policy documented in [docs/storage_retention_policy.md](docs/storage_retention_policy.md).
+
 ## Sharing Note
 
 If this repository stays private, public viewers will see a GitHub `404`. Before using a GitHub link in a resume or application, either make the repo public, add the reviewer as a collaborator, or share an exported README/report/demo artifact. See [docs/submission_checklist.md](docs/submission_checklist.md).
@@ -162,6 +165,7 @@ If this repository stays private, public viewers will see a GitHub `404`. Before
 - [docs/submission_checklist.md](docs/submission_checklist.md)
 - [docs/monitoring_workbench_real_mode_validation.md](docs/monitoring_workbench_real_mode_validation.md)
 - [docs/monitoring_workbench_event_trigger_validation.md](docs/monitoring_workbench_event_trigger_validation.md)
+- [docs/storage_retention_policy.md](docs/storage_retention_policy.md)
 - [serving/docs/vision_routing_design.md](serving/docs/vision_routing_design.md)
 - [serving/docs/project3_tensorrt_report.md](serving/docs/project3_tensorrt_report.md)
 - [serving/docs/cpp_tensorrt_adapter.md](serving/docs/cpp_tensorrt_adapter.md)
@@ -179,6 +183,7 @@ If this repository stays private, public viewers will see a GitHub `404`. Before
 - Model weights and TensorRT engines are not included in git.
 - Quality scores are partly manual / heuristic.
 - No Kubernetes, autoscaling, or production observability stack.
+- Runtime monitoring history is local JSONL with bounded retention, not a production audit database.
 - INT8 calibration has been benchmarked, but it is not the router default because the current calibration set causes detection drift.
 - C++ hot-path worker is benchmarked but not yet connected as the router default.
 
