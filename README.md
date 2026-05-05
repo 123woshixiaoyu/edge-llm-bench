@@ -91,6 +91,7 @@ Source: [serving/docs/project3_tensorrt_report.md](serving/docs/project3_tensorr
 | v0.8 remote VLM profiling | Gemma VLM subprocess latency is measured and reduced with resize/prompt defaults | About 19.0 s baseline to about 16.7-17.2 s recommended config |
 | Fast VLM verifier benchmark | Compact SmolVLM2 models are tested as faster event-level semantic verifiers | Sub-second RTX latency, but 0/36 valid JSON responses, so not a drop-in structured verifier |
 | SmolVLM2 output robustness | Simpler output protocols are tested for machine-parseable event verification | `final_line` protocol makes SmolVLM2-256M a narrow fast-verifier candidate, but not a YOLO/Gemma replacement |
+| YOLO-World trigger benchmark | Open-vocabulary detector is evaluated as a future custom-object trigger path | RTX detects common prompts in ~14-17 ms total; Jetson smoke still pending |
 | v0.9 Monitoring Workbench | Browser UI productizes the gateway into Live Monitor, Event Review, Monitoring Assistant, Event History, System Status, and Model Policy | Real mode calls Jetson Gateway; JSONL history records detections, reviews, rejects, assistant summaries, and event-triggered VLM review status |
 
 Source: [serving/docs/reliability_report.md](serving/docs/reliability_report.md)
@@ -137,6 +138,7 @@ Main entry points:
 - Reliability benchmark: `python3 serving/scripts/reliability_benchmark.py --mode vision --concurrency 1,2,4,8 --requests 20`
 - Fast VLM verifier benchmark: `python3 serving/scripts/benchmark_fast_vlm_verifiers.py --models smolvlm2_500m,smolvlm2_256m,smolvlm2_2b,fastvlm_05b`
 - SmolVLM2 output robustness: `python3 serving/scripts/benchmark_vlm_output_robustness.py --models smolvlm2_500m,smolvlm2_256m,smolvlm2_2b`
+- YOLO-World trigger benchmark: `python3 serving/scripts/benchmark_yolo_world.py --models yolo_worldv2s --class-set all`
 - Interactive demo stack: `python3 demo/run_interactive_stack.py`, then `python3 demo/check_interactive_stack.py`
 - Monitoring Workbench: `streamlit run demo/app.py` or `python3 demo/run_interactive_stack.py --with-ui`
 - Monitoring Workbench real-mode validation: [docs/monitoring_workbench_real_mode_validation.md](docs/monitoring_workbench_real_mode_validation.md)
@@ -176,6 +178,7 @@ If this repository stays private, public viewers will see a GitHub `404`. Before
 - [serving/docs/remote_vlm_latency_optimization.md](serving/docs/remote_vlm_latency_optimization.md)
 - [serving/docs/fast_vlm_verifier_benchmark.md](serving/docs/fast_vlm_verifier_benchmark.md)
 - [serving/docs/vlm_output_robustness.md](serving/docs/vlm_output_robustness.md)
+- [serving/docs/yolo_world_trigger_benchmark.md](serving/docs/yolo_world_trigger_benchmark.md)
 - [serving/docs/interactive_gateway_demo.md](serving/docs/interactive_gateway_demo.md)
 - [serving/docs/reliability_report.md](serving/docs/reliability_report.md)
 - [serving/docs/serving_design.md](serving/docs/serving_design.md)
