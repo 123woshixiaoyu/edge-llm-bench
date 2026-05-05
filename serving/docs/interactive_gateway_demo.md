@@ -11,7 +11,7 @@ The main rule is that real requests go to the Jetson Gateway first. The UI does 
 ## Product Roles
 
 - **YOLO TensorRT** is the local monitoring fast path for camera snapshots and object detection.
-- **Remote VLM** is an event review tool, not a real-time monitoring engine.
+- **Remote VLM** is an event-level semantic verifier, not a real-time monitoring engine.
 - **Text LLM** is the Monitoring Assistant for event summaries, policy explanations, and backend status questions.
 - **Router** remains responsible for local / remote / reject decisions.
 - **History** closes the product loop by recording detections, reviews, rejects, and assistant summaries.
@@ -135,7 +135,32 @@ Modes:
 - Sample mode: reads committed CSV/image evidence. It does not require Jetson, RTX, model files, or TensorRT engines.
 - Real backend mode: calls the configured Jetson Gateway. Backend failures are shown as friendly errors or sample fallback in the UI.
 
-Sample mode may only show stored previews because CSV evidence intentionally avoids storing long generations. Real backend mode displays full model responses when the API returns them.
+Sample mode may only show stored previews because CSV evidence intentionally avoids storing long generations. Real backend mode displays validated final answers when the API returns them.
+
+`max_tokens` controls output length. `latency_budget_ms` controls routing constraints. `Request timeout seconds` controls how long the UI waits. The workbench defaults text and vision generation to `1024` tokens because shorter budgets can be consumed by thinking/analysis text.
+
+## Event-Triggered Monitoring
+
+Live Monitor supports a Streamlit snapshot loop:
+
+- `Auto refresh`
+- refresh interval, default `2 s`
+- stop monitoring
+
+Each refresh captures or loads a frame, runs local YOLO TensorRT, displays the annotated frame, and writes an event record. VLM is not called per frame.
+
+Candidate event rules are intentionally lightweight:
+
+- target labels
+- confidence threshold
+- persistence frames
+- cooldown seconds
+- optional VLM confirmation
+- privacy mode
+
+If a rule matches and VLM confirmation is disabled, the workbench records a local alert. If confirmation is enabled and privacy allows remote review, a single background worker queues the event for RTX VLM review. If privacy is `local_only`, the event is recorded as privacy blocked.
+
+Remote VLM responses are validated before being shown as product answers. Accepted outputs include `FINAL_ANSWER:` text, structured JSON with an `answer`, or a llama.cpp final-channel marker. If only thinking/analysis text is generated before the output limit, the event is marked `incomplete_generation`; the raw text is kept in a debug expander rather than displayed as the final answer.
 
 For remote VLM calls, the demo uses a final-answer-only prompt style and appends a `FINAL_ANSWER:` marker before generation:
 

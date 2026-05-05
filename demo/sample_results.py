@@ -11,6 +11,8 @@ from typing import Any
 
 from PIL import Image, ImageDraw
 
+from output_validation import validate_generation
+
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SAMPLE_IMAGE = REPO_ROOT / "results" / "figures" / "camera_v05_positive_detection.jpg"
@@ -166,6 +168,9 @@ def call_text_backend(
         message = ""
         if data.get("choices"):
             message = data["choices"][0].get("message", {}).get("content", "")
+        validation = validate_generation(message or raw)
+        final_text = validation["final_answer"]
+        display_text = final_text or "Model did not produce a final answer before the output limit."
         decision = data.get("route_decision") or {}
         return {
             "mode": "real",
@@ -173,11 +178,15 @@ def call_text_backend(
             "selected_backend": decision.get("selected_model") or data.get("model", ""),
             "backend_latency_ms": data.get("backend_latency_ms"),
             "total_latency_ms": data.get("total_latency_ms", elapsed_ms),
-            "response_preview": message[:500] or raw[:500],
-            "full_response": message or raw,
+            "response_preview": display_text[:500],
+            "full_response": display_text,
+            "raw_output": validation["raw_output"],
+            "generation_status": validation["status"],
+            "validation_reason": validation["reason"],
+            "structured_answer": validation["structured_answer"],
             "sample_truncated": False,
             "max_tokens_used": max_tokens,
-            "output_chars": len(message or raw),
+            "output_chars": len(display_text),
             "request_timeout_s": timeout_s,
             "reasons": decision.get("reasons", ["real backend response did not include route reasons"]),
             "input_preview": prompt[:120],
@@ -362,6 +371,21 @@ def call_vision_backend(
         detections = data.get("detections") or []
         route = data.get("route", "")
         remote_text = data.get("remote_response_text") or ""
+        validation = validate_generation(remote_text) if route == "remote" else None
+        if validation and validation["status"] != "complete":
+            remote_text = ""
+            data["status"] = "incomplete_generation"
+            data["generation_status"] = validation["status"]
+            data["validation_reason"] = validation["reason"]
+            data["raw_output"] = validation["raw_output"]
+            data["structured_answer"] = validation["structured_answer"]
+        elif validation:
+            remote_text = validation["final_answer"]
+            data["remote_response_text"] = remote_text
+            data["generation_status"] = validation["status"]
+            data["validation_reason"] = validation["reason"]
+            data["raw_output"] = validation["raw_output"]
+            data["structured_answer"] = validation["structured_answer"]
         final_source, final_text = _vision_final_answer(
             route=route,
             labels=labels,
@@ -369,6 +393,8 @@ def call_vision_backend(
             reasons=data.get("reasons") or [],
             remote_text=remote_text,
         )
+        if route == "remote" and validation and validation["status"] != "complete":
+            final_text = "Model did not produce a final answer before the output limit."
         data["local_cv_precheck_labels"] = labels
         data["local_cv_precheck_detections"] = detections
         data["remote_response_preview"] = remote_text[:500]

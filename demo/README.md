@@ -60,17 +60,33 @@ The old manual multi-terminal flow still works as a fallback: start the RTX remo
 - **Sample mode**: default. Reads existing result files and the sample camera frame. No Jetson, RTX, model files, or TensorRT engine is required. Some sample rows only store response previews.
 - **Real backend mode**: optional. Live Monitor and Event Review call `/v1/vision/analyze`; Monitoring Assistant calls `/v1/chat/completions`. If the backend is unavailable, the UI shows a friendly error or sample fallback instead of crashing.
 
-`max_tokens` controls how many output tokens the selected model may generate. It is separate from `latency_budget_ms`, which is used by the router as a routing constraint. If an answer looks cut off, increase max output tokens; this can also increase latency.
+`max_tokens` controls how many output tokens the selected model may generate. It is separate from `latency_budget_ms`, which is used by the router as a routing constraint. `Request timeout seconds` controls how long the UI waits for a response. The workbench defaults text and vision generation to `1024` output tokens so final answers are less likely to be cut off.
 
 `Request timeout seconds` is the UI client's wait limit for text responses. It is separate from `latency_budget_ms`: if the timeout is too small, the UI may show committed sample fallback even though the backend would have completed with more time.
 
 ## Product Flow
 
 - YOLO TensorRT is the local monitoring fast path for snapshot detection/classification.
-- VLM is an event review tool, not the real-time monitoring engine.
+- Live Monitor supports a lightweight snapshot loop with a configurable refresh interval. It is not WebRTC or video streaming.
+- VLM is an event-level semantic verifier, not the real-time monitoring engine.
 - LLM is the Monitoring Assistant for summaries, policy explanations, and backend status questions.
 - Router decisions remain explicit: local, remote, or reject.
 - History closes the loop: detections, semantic reviews, rejects, and assistant summaries are recorded locally.
+
+## Event-Triggered Review
+
+Live Monitor includes a small rule panel:
+
+- watch label, for example `person`, `bottle`, or `chair`
+- confidence threshold
+- persistence frames
+- cooldown seconds
+- optional VLM confirmation
+- privacy mode
+
+When a rule matches, the workbench records a candidate event. If VLM confirmation is disabled, the candidate becomes a local alert. If VLM confirmation is enabled and privacy allows remote review, a background review job is queued so Live Monitor can continue refreshing. If privacy is `local_only`, the event is recorded as privacy blocked.
+
+The remote VLM prompt requests JSON-only output. If the model only produces thinking/analysis text before the output limit, the event is marked `incomplete_generation` and the raw output is shown only in a debug expander.
 
 ## Event History
 
@@ -97,5 +113,6 @@ Use `serving/configs_interactive_demo` for the Jetson Gateway. Expected runtime 
 - This is a workbench demo, not production serving.
 - Sample mode is evidence playback, not live inference.
 - Real vision mode is single-frame interaction, not video streaming.
+- Auto refresh is a Streamlit snapshot loop, not a true real-time video pipeline.
 - Remote VLM routes are real when the RTX VLM service/tunnel is running, but they can take 15-20 seconds.
 - No login, database, cloud deploy, video stream, model download, or new benchmark is included.

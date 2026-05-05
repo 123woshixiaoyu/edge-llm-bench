@@ -2,7 +2,7 @@
 
 **Constraint-aware routing across local LLM/CV and remote LLM/VLM backends.**
 
-This project is a Jetson-first edge AI inference gateway, not a single-model demo. It turns benchmark results into a local-first monitoring workbench: Jetson handles low-latency local detection and private tasks, while RTX backends are used for event review, summaries, and heavier semantic reasoning only when privacy and system constraints allow.
+This project is a Jetson-first edge AI inference gateway, not a single-model demo. It turns benchmark results into a local-first monitoring workbench: Jetson handles low-latency local detection and private tasks, while RTX backends are used for event review, summaries, and heavier semantic reasoning only when privacy and system constraints allow. The monitoring path is event-triggered: YOLO TensorRT runs locally on snapshots, and VLM review is queued only for candidate events.
 
 ## What This Project Is
 
@@ -89,7 +89,7 @@ Source: [serving/docs/project3_tensorrt_report.md](serving/docs/project3_tensorr
 | v0.6 YOLO TensorRT router | Optimized local CV backend is used by router | 10/10 routes, `fallback_used=false` |
 | v0.7 reliability benchmark | Queue/fallback/reject/timeout behavior is explainable | 80 benchmark requests, pass rate 1.0 at concurrency 1/2/4/8; 9/9 failure modes |
 | v0.8 remote VLM profiling | Gemma VLM subprocess latency is measured and reduced with resize/prompt defaults | About 19.0 s baseline to about 16.7-17.2 s recommended config |
-| v0.9 Monitoring Workbench | Browser UI productizes the gateway into Live Monitor, Event Review, Monitoring Assistant, Event History, System Status, and Model Policy | Real mode calls Jetson Gateway; JSONL history records detections, reviews, rejects, and assistant summaries |
+| v0.9 Monitoring Workbench | Browser UI productizes the gateway into Live Monitor, Event Review, Monitoring Assistant, Event History, System Status, and Model Policy | Real mode calls Jetson Gateway; JSONL history records detections, reviews, rejects, assistant summaries, and event-triggered VLM review status |
 
 Source: [serving/docs/reliability_report.md](serving/docs/reliability_report.md)
 
@@ -136,6 +136,7 @@ Main entry points:
 - Interactive demo stack: `python3 demo/run_interactive_stack.py`, then `python3 demo/check_interactive_stack.py`
 - Monitoring Workbench: `streamlit run demo/app.py` or `python3 demo/run_interactive_stack.py --with-ui`
 - Monitoring Workbench real-mode validation: [docs/monitoring_workbench_real_mode_validation.md](docs/monitoring_workbench_real_mode_validation.md)
+- Event-triggered monitoring validation: [docs/monitoring_workbench_event_trigger_validation.md](docs/monitoring_workbench_event_trigger_validation.md)
 - Interactive gateway smoke: `python3 serving/scripts/smoke_interactive_gateway.py --url http://127.0.0.1:8000`
 - Interactive demo notes: [serving/docs/interactive_gateway_demo.md](serving/docs/interactive_gateway_demo.md)
 - Setup notes: [docs/setup_requirements.md](docs/setup_requirements.md)
@@ -160,6 +161,7 @@ If this repository stays private, public viewers will see a GitHub `404`. Before
 - [docs/setup_requirements.md](docs/setup_requirements.md)
 - [docs/submission_checklist.md](docs/submission_checklist.md)
 - [docs/monitoring_workbench_real_mode_validation.md](docs/monitoring_workbench_real_mode_validation.md)
+- [docs/monitoring_workbench_event_trigger_validation.md](docs/monitoring_workbench_event_trigger_validation.md)
 - [serving/docs/vision_routing_design.md](serving/docs/vision_routing_design.md)
 - [serving/docs/project3_tensorrt_report.md](serving/docs/project3_tensorrt_report.md)
 - [serving/docs/cpp_tensorrt_adapter.md](serving/docs/cpp_tensorrt_adapter.md)

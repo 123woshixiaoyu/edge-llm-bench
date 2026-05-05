@@ -2,13 +2,18 @@ from __future__ import annotations
 
 import base64
 import os
+import queue
+import threading
+import time
 from io import BytesIO
 from pathlib import Path
 from typing import Any
 
 import streamlit as st
 
-from event_store import append_event, load_recent_events, summarize_recent_events
+from event_store import append_event, load_recent_events, summarize_recent_events, update_event
+from monitoring_rules import MonitoringRule, detection_signature, evaluate_rule
+from output_validation import structured_vlm_prompt
 from sample_results import (
     SAMPLE_IMAGE,
     backend_status,
@@ -81,6 +86,11 @@ def _event_from_result(
         "prompt": prompt,
         "task_type": task_type,
         "privacy": privacy,
+        "status": result.get("generation_status") or result.get("status") or "success",
+        "frame_id": result.get("frame_id"),
+        "detection_changed": result.get("detection_changed"),
+        "trigger_matched": result.get("trigger_matched"),
+        "vlm_review_status": result.get("vlm_review_status", "none"),
         "route": result.get("route"),
         "selected_backend": result.get("selected_backend") or result.get("local_cv_backend"),
         "local_cv_labels": _labels(result),
@@ -91,6 +101,8 @@ def _event_from_result(
         or result.get("full_response")
         or result.get("response_preview")
         or "",
+        "raw_output": result.get("raw_output", ""),
+        "structured_answer": result.get("structured_answer"),
         "reasons": result.get("reasons") or [],
         "error": result.get("error") or "",
         "mode": result.get("mode"),
@@ -120,6 +132,80 @@ def _record_event(
     if event.get("image_path"):
         st.session_state["latest_image_path"] = event["image_path"]
     return event
+
+
+def _ensure_review_worker(api_base_url: str) -> queue.Queue:
+    worker_key = "vlm_review_worker"
+    queue_key = "vlm_review_queue"
+    if (
+        worker_key in st.session_state
+        and st.session_state[worker_key].is_alive()
+        and st.session_state.get("vlm_review_api_base_url") == api_base_url
+    ):
+        return st.session_state[queue_key]
+
+    review_queue: queue.Queue = queue.Queue()
+
+    def worker() -> None:
+        while True:
+            job = review_queue.get()
+            if job is None:
+                break
+            event_id = job["event_id"]
+            update_event(event_id, {"vlm_review_status": "running"})
+            try:
+                result = call_vision_backend(
+                    api_base_url,
+                    image_source="upload",
+                    image_path=job["image_path"],
+                    task_type="vqa",
+                    privacy="allow_remote",
+                    quality="high",
+                    latency_budget_ms=15000,
+                    prompt=job["prompt"],
+                    max_tokens=job["max_tokens"],
+                    timeout_s=260,
+                )
+                status = "done"
+                if result.get("generation_status") == "incomplete_generation":
+                    status = "incomplete_generation"
+                elif result.get("route") != "remote" or result.get("error"):
+                    status = "failed"
+                update_event(
+                    event_id,
+                    {
+                        "vlm_review_status": status,
+                        "route": result.get("route"),
+                        "remote_latency_ms": _as_float(result.get("remote_latency_ms")),
+                        "total_latency_ms": _as_float(result.get("total_latency_ms")),
+                        "final_answer_text": result.get("final_answer_text") or result.get("full_response") or "",
+                        "raw_output": result.get("raw_output", ""),
+                        "structured_answer": result.get("structured_answer"),
+                        "reasons": result.get("reasons", []),
+                        "error": result.get("error", ""),
+                        "selected_backend": result.get("selected_backend"),
+                        "status": status,
+                        "mode": result.get("mode"),
+                    },
+                )
+            except Exception as exc:
+                update_event(
+                    event_id,
+                    {
+                        "vlm_review_status": "failed",
+                        "status": "failed",
+                        "error": f"VLM review worker failed: {exc}",
+                    },
+                )
+            finally:
+                review_queue.task_done()
+
+    thread = threading.Thread(target=worker, name="vlm-review-worker", daemon=True)
+    thread.start()
+    st.session_state[queue_key] = review_queue
+    st.session_state[worker_key] = thread
+    st.session_state["vlm_review_api_base_url"] = api_base_url
+    return review_queue
 
 
 def _select_image_source(label: str, *, default_camera: bool, key_prefix: str) -> tuple[str, Any]:
@@ -185,6 +271,11 @@ def _display_routing_decision(result: dict[str, Any]) -> None:
 def _display_final_answer(result: dict[str, Any]) -> None:
     route = result.get("route")
     st.markdown("#### Final Routed Answer")
+    if result.get("generation_status") == "incomplete_generation" or result.get("status") == "incomplete_generation":
+        st.error("Model did not produce a final answer before the output limit.")
+        with st.expander("Debug raw model output"):
+            st.text_area("Raw output", value=result.get("raw_output", ""), height=220)
+        return
     if route == "local":
         st.success("Final answer source: Jetson local CV")
         st.write("Detection/classification was completed locally on Jetson.")
@@ -225,7 +316,9 @@ def render_header() -> tuple[bool, str]:
 
 def render_live_monitor(use_sample_mode: bool, api_base_url: str) -> None:
     st.subheader("Live Monitor")
-    st.write("Capture a single snapshot and run the local Jetson YOLO TensorRT monitoring fast path.")
+    st.write("Capture snapshots and run the local Jetson YOLO TensorRT monitoring fast path.")
+    if "vlm_review_queue" in st.session_state:
+        st.caption(f"VLM review pending: {st.session_state['vlm_review_queue'].qsize()}")
 
     left, right = st.columns([2, 1])
     with left:
@@ -234,6 +327,19 @@ def render_live_monitor(use_sample_mode: bool, api_base_url: str) -> None:
             default_camera=not use_sample_mode,
             key_prefix="live",
         )
+        auto_refresh = st.toggle("Auto refresh", value=st.session_state.get("live_auto_refresh", False))
+        st.session_state["live_auto_refresh"] = auto_refresh
+        interval_s = st.number_input(
+            "Refresh interval seconds",
+            min_value=1,
+            max_value=30,
+            value=2,
+            step=1,
+            key="live_refresh_interval",
+        )
+        if st.button("Stop monitoring"):
+            st.session_state["live_auto_refresh"] = False
+            st.rerun()
     with right:
         with st.expander("Advanced routing settings"):
             task_type = st.selectbox("Task", ["detect", "classify"], index=0, key="live_task")
@@ -250,13 +356,29 @@ def render_live_monitor(use_sample_mode: bool, api_base_url: str) -> None:
             max_tokens = st.number_input(
                 "Max output tokens",
                 min_value=32,
-                max_value=1024,
-                value=128,
+                max_value=2048,
+                value=1024,
                 step=32,
                 key="live_tokens",
             )
+        with st.expander("Event trigger rule"):
+            rule_enabled = st.checkbox("Enable candidate event trigger", value=True)
+            watch_label = st.text_input("Watch label", value="person")
+            confidence_threshold = st.slider("Confidence threshold", min_value=0.0, max_value=1.0, value=0.30, step=0.05)
+            persistence_frames = st.number_input("Persistence frames", min_value=1, max_value=10, value=1, step=1)
+            cooldown_seconds = st.number_input("Cooldown seconds", min_value=0, max_value=300, value=10, step=5)
+            require_vlm_confirmation = st.checkbox("Require VLM confirmation", value=False)
+            rule_privacy = st.radio("Review privacy", ["allow_remote", "local_only"], horizontal=True)
+            vlm_prompt = st.text_area(
+                "VLM confirmation prompt",
+                value="Does this image contain the watched object? Answer JSON only.",
+                height=80,
+            )
 
-    if st.button("Run Local Detection", type="primary"):
+    manual_capture = st.button("Capture Snapshot / Run Local Detection", type="primary")
+    should_capture = manual_capture or st.session_state.get("live_auto_refresh", False)
+
+    if should_capture:
         if use_sample_mode:
             result = select_vision_sample(task_type, privacy, quality)
             image_for_display = str(SAMPLE_IMAGE)
@@ -276,12 +398,60 @@ def render_live_monitor(use_sample_mode: bool, api_base_url: str) -> None:
                 )
             image_for_display = _image_for_result(result, image_payload or str(SAMPLE_IMAGE))
 
+        frame_id = int(st.session_state.get("live_frame_id", 0)) + 1
+        st.session_state["live_frame_id"] = frame_id
+        signature = detection_signature(_detections(result))
+        previous_signature = st.session_state.get("last_detection_signature")
+        detection_changed = signature != previous_signature
+        st.session_state["last_detection_signature"] = signature
+
+        rule = MonitoringRule(
+            rule_name="live_monitor_watch_label",
+            enabled=rule_enabled,
+            target_labels=[label.strip() for label in watch_label.split(",")],
+            confidence_threshold=float(confidence_threshold),
+            persistence_frames=int(persistence_frames),
+            cooldown_seconds=float(cooldown_seconds),
+            require_vlm_confirmation=bool(require_vlm_confirmation),
+            vlm_prompt=structured_vlm_prompt(vlm_prompt),
+            privacy=rule_privacy,
+        )
+        rule_state = st.session_state.setdefault("monitoring_rule_state", {})
+        rule_result = evaluate_rule(_detections(result), rule, rule_state)
+        result["frame_id"] = frame_id
+        result["detection_changed"] = detection_changed
+        result["trigger_matched"] = rule_result["trigger_matched"]
+        result["vlm_review_status"] = "none"
+
         if result.get("mode") == "sample fallback":
             st.warning("Real backend unavailable; showing committed sample fallback.")
+
+        if rule_result["trigger_matched"]:
+            st.warning("Candidate Event: trigger matched local detection rule.")
+            if require_vlm_confirmation and rule_privacy == "allow_remote":
+                result["vlm_review_status"] = "queued"
+                result["final_answer_text"] = "Candidate event queued for workstation VLM review."
+            elif require_vlm_confirmation and rule_privacy == "local_only":
+                result["vlm_review_status"] = "failed"
+                result["route"] = "reject"
+                result["status"] = "privacy_blocked"
+                result["final_answer_text"] = (
+                    "Privacy Blocked: semantic review would require sending the image to the remote workstation."
+                )
+                result["reasons"] = [
+                    "privacy=local_only blocks remote semantic review for candidate event",
+                    *result.get("reasons", []),
+                ]
+            else:
+                result["status"] = "local_alert"
+                result["final_answer_text"] = "Local alert generated from YOLO TensorRT detection rule."
+        else:
+            st.caption(f"No candidate event triggered: {rule_result['reason']}")
 
         _display_local_precheck(result, image_for_display, "Current snapshot with local YOLO monitoring boxes")
         _display_routing_decision(result)
         st.success("Route/location: Processed on Jetson" if result.get("route") == "local" else "Route/location recorded by policy")
+
         event = _record_event(
             source="live_monitor",
             result=result,
@@ -289,7 +459,32 @@ def render_live_monitor(use_sample_mode: bool, api_base_url: str) -> None:
             privacy=privacy,
             image_source=_image_source_for_event(result, image_payload or str(SAMPLE_IMAGE)),
         )
+        if rule_result["trigger_matched"] and require_vlm_confirmation and rule_privacy == "allow_remote":
+            if event.get("image_path"):
+                review_queue = _ensure_review_worker(api_base_url)
+                review_queue.put(
+                    {
+                        "event_id": event["event_id"],
+                        "image_path": event["image_path"],
+                        "prompt": rule.vlm_prompt,
+                        "max_tokens": int(max_tokens),
+                    }
+                )
+                st.info("VLM review queued. Live Monitor can continue refreshing while review runs.")
+            else:
+                update_event(
+                    event["event_id"],
+                    {
+                        "vlm_review_status": "failed",
+                        "status": "failed",
+                        "error": "candidate event image was not available for VLM review",
+                    },
+                )
         st.caption(f"Recorded event {event['event_id']} in Event History.")
+
+    if st.session_state.get("live_auto_refresh", False):
+        time.sleep(float(interval_s))
+        st.rerun()
 
 
 def render_event_review(use_sample_mode: bool, api_base_url: str) -> None:
@@ -320,14 +515,14 @@ def render_event_review(use_sample_mode: bool, api_base_url: str) -> None:
             image_payload = str(SAMPLE_IMAGE)
         prompt = st.text_area(
             "Ask about this event",
-            value="Describe this monitoring event in one concise sentence.",
+            value="Is this monitoring event an alert? Return the structured JSON answer.",
             height=100,
         )
     with right:
         task_type = st.selectbox("Review task", ["scene_description", "vqa"], index=0)
         privacy = st.radio("Privacy mode", ["allow_remote", "local_only"], index=0, horizontal=True)
         quality = st.selectbox("Review quality", ["medium", "high", "low"], index=0)
-        max_tokens = st.number_input("Vision max output tokens", min_value=32, max_value=1024, value=384, step=32)
+        max_tokens = st.number_input("Vision max output tokens", min_value=32, max_value=1024, value=1024, step=32)
         latency_budget_ms = st.number_input(
             "Latency budget ms",
             min_value=100,
@@ -356,7 +551,7 @@ def render_event_review(use_sample_mode: bool, api_base_url: str) -> None:
                     privacy=privacy,
                     quality=quality,
                     latency_budget_ms=int(latency_budget_ms),
-                    prompt=prompt,
+                    prompt=structured_vlm_prompt(prompt),
                     max_tokens=int(max_tokens),
                 )
             image_for_display = _image_for_result(result, image_payload or str(SAMPLE_IMAGE))
@@ -411,7 +606,7 @@ def render_monitoring_assistant(use_sample_mode: bool, api_base_url: str) -> Non
             step=500,
             key="assistant_latency",
         )
-        max_tokens = st.number_input("Max output tokens", min_value=32, max_value=2048, value=512, step=32)
+        max_tokens = st.number_input("Max output tokens", min_value=32, max_value=2048, value=1024, step=32)
         timeout_s = st.number_input("Request timeout seconds", min_value=5, max_value=180, value=60, step=5)
 
     if st.button("Ask Monitoring Assistant", type="primary"):
@@ -437,6 +632,10 @@ def render_monitoring_assistant(use_sample_mode: bool, api_base_url: str) -> Non
         if result.get("mode") == "sample fallback":
             st.warning("Real backend timed out/unavailable; showing committed sample fallback.")
         _display_routing_decision(result)
+        if result.get("generation_status") == "incomplete_generation":
+            st.error("Model did not produce a final answer before the output limit.")
+            with st.expander("Debug raw model output"):
+                st.text_area("Raw output", value=result.get("raw_output", ""), height=220)
         st.text_area("Assistant answer", value=result.get("full_response") or result.get("response_preview", ""), height=260)
         event = _record_event(
             source="monitoring_assistant",
@@ -465,6 +664,8 @@ def render_event_history() -> None:
             "source": event.get("source"),
             "task_type": event.get("task_type"),
             "route": event.get("route"),
+            "status": event.get("status"),
+            "vlm_review_status": event.get("vlm_review_status"),
             "selected_backend": event.get("selected_backend"),
             "latency_ms": event.get("total_latency_ms"),
             "error": event.get("error"),

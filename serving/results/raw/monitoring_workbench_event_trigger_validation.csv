@@ -1,0 +1,10 @@
+check,local_cv_latency_ms,notes,remote_latency_ms,route,status,total_latency_ms
+system_status,,"{""status"": ""ok"", ""backend_mode"": ""llamacpp"", ""local_backend_available"": true, ""remote_backend_available"": true, ""vision_local_cv_backend"": ""yolo_tensorrt_fp16"", ""vision_remote_vlm_available"": true, ""vision_remote_is_mock"": false, ""local_queue_depth"": 0, ""remote_queue_depth"": 0, ""jetson_temp_c"": 55.0}",,,PASS,664.56
+live_monitor_camera_detection,15.29,"labels=['bottle', 'bowl']",,local,PASS,1285.58
+local_alert_trigger,,watch_label=bottle; reason=rule_matched,,local,PASS,
+local_alert_history_event,,408ba2e429fa,,local,PASS,
+privacy_blocked_event,,12359404f7eb,,reject,PASS,
+vlm_structured_review,,generation_status=complete; structured=True,25121.52,remote,PASS,25161.04
+thinking_only_validation,,thinking_without_final_answer,,,PASS,
+monitoring_assistant_1024_tokens,,generation_status=complete; chars=196,,local,PASS,1312.41
+incomplete_generation_history_event,,5db3b2d50a71,,remote,PASS,

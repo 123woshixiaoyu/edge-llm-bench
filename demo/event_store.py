@@ -100,6 +100,33 @@ def load_recent_events(limit: int = 50, route_filter: str = "all") -> list[dict[
     return list(reversed(records[-limit:]))
 
 
+def update_event(event_id: str, updates: dict[str, Any]) -> dict[str, Any] | None:
+    if not EVENT_LOG_PATH.exists():
+        return None
+
+    records: list[dict[str, Any]] = []
+    updated: dict[str, Any] | None = None
+    with EVENT_LOG_PATH.open("r", encoding="utf-8") as handle:
+        for line in handle:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                record = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if record.get("event_id") == event_id:
+                record.update(updates)
+                record["updated_at"] = datetime.now(timezone.utc).isoformat()
+                updated = record
+            records.append(record)
+
+    with EVENT_LOG_PATH.open("w", encoding="utf-8") as handle:
+        for record in records:
+            handle.write(json.dumps(record, ensure_ascii=False, default=_json_default) + "\n")
+    return updated
+
+
 def summarize_recent_events(limit: int = 8) -> str:
     events = load_recent_events(limit=limit)
     if not events:
@@ -115,6 +142,8 @@ def summarize_recent_events(limit: int = 8) -> str:
             f"{event.get('source', 'unknown')} "
             f"task={event.get('task_type', '')} "
             f"route={event.get('route', '')} "
+            f"status={event.get('status', '')} "
+            f"vlm_review={event.get('vlm_review_status', '')} "
             f"backend={event.get('selected_backend', '')} "
             f"labels={label_text} "
             f"error={event.get('error', '')}"
