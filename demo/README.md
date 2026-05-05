@@ -6,7 +6,7 @@ This Streamlit demo presents the project as a **Jetson Local-First Monitoring Ga
 
 The UI is intentionally thin. It calls the existing Jetson Gateway in real mode and reads committed evidence in sample mode. It does not duplicate router policy, download models, start a database, or bypass Jetson to call RTX directly.
 
-## Workbench Tabs
+## Workbench Pages
 
 - **Live Monitor**: capture or load a single snapshot and run the Jetson YOLO TensorRT local monitoring fast path.
 - **Event Review**: ask semantic questions about the current/recent snapshot. Privacy-safe mode rejects remote VLM review instead of sending the image out.
@@ -14,6 +14,8 @@ The UI is intentionally thin. It calls the existing Jetson Gateway in real mode 
 - **Event History**: local JSONL event log for detections, reviews, rejects, and assistant summaries.
 - **System Status**: product-language health view for Jetson Gateway, local LLM/CV, RTX LLM, and RTX VLM.
 - **Model Policy**: read-only explanation of why each backend is used.
+
+The workbench uses a sidebar page selector instead of Streamlit tabs. Only the active page runs, so Event Review and Monitoring Assistant actions do not accidentally trigger Live Monitor camera capture.
 
 ## Recommended Real-Mode Start
 
@@ -67,7 +69,8 @@ The old manual multi-terminal flow still works as a fallback: start the RTX remo
 ## Product Flow
 
 - YOLO TensorRT is the local monitoring fast path for snapshot detection/classification.
-- Live Monitor supports a lightweight snapshot loop with a configurable refresh interval. It is not WebRTC or video streaming.
+- Live Monitor supports a lightweight snapshot loop with Start Monitoring / Stop Monitoring and Capture Once controls. It is not WebRTC or video streaming.
+- Capture latency is camera/frame acquisition plus the gateway capture path; in snapshot mode it can be around 1s. YOLO inference latency is the TensorRT model execution time and is usually around 10-30ms.
 - VLM is an event-level semantic verifier, not the real-time monitoring engine.
 - LLM is the Monitoring Assistant for summaries, policy explanations, and backend status questions.
 - Router decisions remain explicit: local, remote, or reject.
@@ -99,7 +102,7 @@ runtime_data/events/images/
 
 This directory is intentionally ignored by git. Each event records source, task type, privacy, route, backend, local CV labels, latency, final answer text, reasons, errors, and mode. It is a lightweight product loop, not a production database.
 
-Auto refresh does not save every frame as a long-term event. Ordinary refreshes only overwrite `runtime_data/events/latest_snapshot.jpg`; alerts, trigger matches, VLM reviews, rejects, backend errors/fallbacks, assistant summaries, and user-saved snapshots are retained. Saved events include retention metadata such as whether an image was stored, whether the frame was sent to the remote workstation, and when the record expires.
+Auto refresh does not save every frame as a long-term event. Ordinary refreshes only overwrite `runtime_data/events/latest_snapshot.jpg`; alerts, trigger matches, VLM reviews, rejects, backend errors/fallbacks, assistant summaries, and user-saved snapshots are retained. Detection changes alone are treated as latest-snapshot metadata unless the user saves the event or a trigger/review/error occurs. Saved events include retention metadata such as whether an image was stored, whether the frame was sent to the remote workstation, and when the record expires.
 
 Default storage policy:
 
@@ -123,6 +126,6 @@ Use `serving/configs_interactive_demo` for the Jetson Gateway. Expected runtime 
 - This is a workbench demo, not production serving.
 - Sample mode is evidence playback, not live inference.
 - Real vision mode is single-frame interaction, not video streaming.
-- Auto refresh is a Streamlit snapshot loop, not a true real-time video pipeline.
+- Auto refresh is a Streamlit page-local snapshot loop, not a true real-time video pipeline. If the installed Streamlit version lacks non-blocking fragments, use Capture Once.
 - Remote VLM routes are real when the RTX VLM service/tunnel is running, but they can take 15-20 seconds.
 - No login, database, cloud deploy, video stream, model download, or new benchmark is included.

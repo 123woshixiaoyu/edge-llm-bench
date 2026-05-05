@@ -14,6 +14,8 @@ Long-term Event History records are saved when one of these conditions is true:
 - a backend error or sample fallback happens;
 - Monitoring Assistant generates a summary.
 
+Detection changes during ordinary auto refresh are not retained by themselves. They update latest-snapshot metadata unless the user saves the snapshot or a trigger/review/reject/error condition occurs.
+
 Each saved event can include structured metadata such as labels, boxes, confidence, latency, route, selected backend, privacy mode, reasons, and final answer text.
 
 ## What Is Not Saved

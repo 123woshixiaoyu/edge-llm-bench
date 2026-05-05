@@ -1,5 +1,6 @@
 case,expected,actual,status
 ordinary_auto_refresh,metadata not persisted and latest snapshot overwritten,stored_event=false and events log remains empty,pass
+detection_changed_only,detection changes do not create long-term events without save/trigger/review/reject/error,stored_event=false latest snapshot only,pass
 trigger_event,trigger match saves event and image,stored_event=true stored_image=true,pass
 remote_vlm_review,remote review event records remote transfer,sent_to_remote=true,pass
 privacy_reject,privacy-safe reject saves metadata without remote transfer,sent_to_remote=false stored_image=false,pass

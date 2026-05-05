@@ -121,7 +121,7 @@ streamlit run demo/app.py
 
 The Router API base URL field defaults to the Jetson Gateway at `http://192.168.1.102:8000`, while the Streamlit UI itself typically opens at `http://127.0.0.1:8501`. Set `EDGE_GATEWAY_URL` before launch to use a different Jetson address.
 
-Tabs:
+Pages:
 
 - Live Monitor: capture/load a snapshot and run Jetson local YOLO TensorRT detection/classification.
 - Event Review: ask semantic questions about the current/recent snapshot, with privacy-safe reject behavior.
@@ -129,6 +129,8 @@ Tabs:
 - Event History: show recent JSONL events and associated local images.
 - System Status: product-language health view for Jetson Gateway, local LLM/CV, RTX LLM, and RTX VLM.
 - Model Policy: read-only explanation of the backend choices.
+
+The workbench uses a sidebar page selector rather than `st.tabs`. Only the active page executes. This keeps Live Monitor capture from running when the user clicks Event Review or Monitoring Assistant controls.
 
 Modes:
 
@@ -143,11 +145,19 @@ Sample mode may only show stored previews because CSV evidence intentionally avo
 
 Live Monitor supports a Streamlit snapshot loop:
 
-- `Auto refresh`
+- `Start Monitoring`
+- `Stop Monitoring`
+- `Capture Once`
 - refresh interval, default `2 s`
-- stop monitoring
 
-Each refresh captures or loads a frame, runs local YOLO TensorRT, displays the annotated frame, and writes an event record. VLM is not called per frame.
+Each refresh captures or loads a frame, runs local YOLO TensorRT, and displays the annotated frame. VLM is not called per frame. Ordinary refreshes update only the latest snapshot; long-term Event History is reserved for alerts, trigger matches, VLM reviews, rejects, backend errors/fallbacks, assistant summaries, and user-saved snapshots.
+
+The UI separates two latency numbers:
+
+- **Capture latency:** camera/frame acquisition plus the gateway capture path. Snapshot capture can be around `1 s`.
+- **YOLO inference latency:** TensorRT model execution time. This is usually around `10-30 ms`.
+
+Future persistent camera workers could reduce or amortize the capture cost; v0.9 keeps the simpler snapshot path.
 
 Candidate event rules are intentionally lightweight:
 
@@ -197,7 +207,7 @@ runtime_data/events/images/
 
 This is the minimum product loop. It is not SQLite, a search system, or a production audit database.
 
-The store has a lightweight retention policy. Ordinary auto-refresh frames are not written to long-term history; they only overwrite `runtime_data/events/latest_snapshot.jpg`. Events are retained for user saves, trigger matches, local alerts, VLM reviews, privacy rejects, backend errors/fallbacks, and assistant summaries.
+The store has a lightweight retention policy. Ordinary auto-refresh frames are not written to long-term history; they only overwrite `runtime_data/events/latest_snapshot.jpg`. Events are retained for user saves, trigger matches, local alerts, VLM reviews, privacy rejects, backend errors/fallbacks, and assistant summaries. Detection changes alone do not persist long-term unless the user saves them or a trigger/review/error occurs.
 
 Default limits are `500` events, `512 MB` of retained event images, and `7` days. They can be overridden with `MONITORING_MAX_EVENTS`, `MONITORING_MAX_IMAGES_MB`, and `MONITORING_RETENTION_DAYS`. Cleanup runs after event append/update, removes unreferenced images, and marks events with `image_missing=true` if an old image is deleted while metadata remains. See [../../docs/storage_retention_policy.md](../../docs/storage_retention_policy.md).
 

@@ -1,0 +1,8 @@
+case,expected,validation,status
+single_page_navigation,Only selected page renders so Event Review/Assistant do not trigger Live Monitor capture,app.py uses sidebar radio and no st.tabs,pass
+start_stop_controls,Monitoring has explicit Start Monitoring and Stop Monitoring states,app.py uses monitoring_running session state,pass
+nonblocking_refresh,No global time.sleep/rerun loop blocks the full Streamlit app,app.py contains no time.sleep and uses Streamlit fragment when available,pass
+event_review_current_page,Event Review result is shown on the current page and retained in session state,latest_event_review_result stores displayed result,pass
+assistant_current_page,Monitoring Assistant answer is shown on the current page and retained in session state,latest_assistant_result stores displayed result,pass
+detection_changed_retention,detection_changed alone does not create long-term event history,event_store temp-dir test confirms stored_event=false,pass
+capture_vs_inference_copy,UI explains camera capture latency separately from YOLO TensorRT inference latency,Live Monitor precheck displays both metrics and explanation,pass

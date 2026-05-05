@@ -92,8 +92,6 @@ def _event_should_persist(event: dict[str, Any]) -> bool:
         return True
     if event.get("trigger_matched") is True:
         return True
-    if event.get("detection_changed") is True:
-        return True
     if event.get("vlm_review_status") not in {None, "", "none"}:
         return True
     if event.get("route") == "reject":
@@ -131,8 +129,6 @@ def _image_retention_reason(event: dict[str, Any]) -> str:
         return "event_review"
     if event.get("source") == "monitoring_assistant":
         return "assistant_summary"
-    if event.get("detection_changed") is True:
-        return "detection_changed"
     if event.get("status") in {"backend_error", "sample fallback", "failed"}:
         return "error_or_fallback"
     return "event"

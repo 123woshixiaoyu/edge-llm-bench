@@ -151,7 +151,7 @@ Runtime assets are intentionally outside git:
 - calibration images/caches
 - runtime workbench history under `runtime_data/`
 
-The workbench does not retain every auto-refresh frame. Ordinary frames overwrite the latest snapshot, while alerts, trigger matches, reviews, rejects, backend errors/fallbacks, assistant summaries, and user-saved events follow the retention policy documented in [docs/storage_retention_policy.md](docs/storage_retention_policy.md).
+The workbench does not retain every auto-refresh frame. Ordinary frames overwrite the latest snapshot, while alerts, trigger matches, reviews, rejects, backend errors/fallbacks, assistant summaries, and user-saved events follow the retention policy documented in [docs/storage_retention_policy.md](docs/storage_retention_policy.md). The UI separates capture latency from YOLO TensorRT inference latency because snapshot camera acquisition can dominate the end-to-end path.
 
 ## Sharing Note
 

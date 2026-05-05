@@ -249,7 +249,14 @@ def _display_local_precheck(result: dict[str, Any], image_payload: Any, caption:
         else:
             st.warning("No snapshot image is available for display.")
     with right:
-        st.metric("Local CV inference ms", result.get("local_cv_inference_latency_ms") or "n/a")
+        metric_cols = st.columns(2)
+        metric_cols[0].metric("Capture latency ms", result.get("capture_latency_ms") or "n/a")
+        metric_cols[1].metric("YOLO inference ms", result.get("local_cv_inference_latency_ms") or "n/a")
+        st.caption(
+            "Capture latency is camera/frame acquisition plus the gateway capture pipeline. "
+            "YOLO inference latency is the TensorRT model execution time. In snapshot mode, "
+            "capture can be around 1s while YOLO inference is usually around 10-30ms."
+        )
         st.write(f"Detected labels: {', '.join(str(label) for label in labels) if labels else 'none'}")
         st.json(
             {
@@ -326,15 +333,155 @@ def render_header() -> tuple[bool, str]:
     return use_sample_mode, api_base_url
 
 
+def _run_live_monitor_capture(
+    *,
+    use_sample_mode: bool,
+    api_base_url: str,
+    image_source: str,
+    image_payload: Any,
+    task_type: str,
+    privacy: str,
+    quality: str,
+    latency_budget_ms: int,
+    max_tokens: int,
+    rule_enabled: bool,
+    watch_label: str,
+    confidence_threshold: float,
+    persistence_frames: int,
+    cooldown_seconds: float,
+    require_vlm_confirmation: bool,
+    rule_privacy: str,
+    vlm_prompt: str,
+    user_save: bool,
+) -> None:
+    if use_sample_mode:
+        result = select_vision_sample(task_type, privacy, quality)
+        image_for_display = str(SAMPLE_IMAGE)
+    else:
+        backend_source = "camera" if image_source == "Jetson camera" else "upload"
+        with st.spinner("Calling Jetson Gateway for local monitoring detection."):
+            result = call_vision_backend(
+                api_base_url,
+                image_source=backend_source,
+                image_path=image_payload or str(SAMPLE_IMAGE),
+                task_type=task_type,
+                privacy=privacy,
+                quality=quality,
+                latency_budget_ms=int(latency_budget_ms),
+                prompt="",
+                max_tokens=int(max_tokens),
+            )
+        image_for_display = _image_for_result(result, image_payload or str(SAMPLE_IMAGE))
+
+    frame_id = int(st.session_state.get("live_frame_id", 0)) + 1
+    st.session_state["live_frame_id"] = frame_id
+    signature = detection_signature(_detections(result))
+    previous_signature = st.session_state.get("last_detection_signature")
+    detection_changed = signature != previous_signature
+    st.session_state["last_detection_signature"] = signature
+
+    rule = MonitoringRule(
+        rule_name="live_monitor_watch_label",
+        enabled=rule_enabled,
+        target_labels=[label.strip() for label in watch_label.split(",")],
+        confidence_threshold=float(confidence_threshold),
+        persistence_frames=int(persistence_frames),
+        cooldown_seconds=float(cooldown_seconds),
+        require_vlm_confirmation=bool(require_vlm_confirmation),
+        vlm_prompt=structured_vlm_prompt(vlm_prompt),
+        privacy=rule_privacy,
+    )
+    rule_state = st.session_state.setdefault("monitoring_rule_state", {})
+    rule_result = evaluate_rule(_detections(result), rule, rule_state)
+    result["frame_id"] = frame_id
+    result["detection_changed"] = detection_changed
+    result["trigger_matched"] = rule_result["trigger_matched"]
+    result["vlm_review_status"] = "none"
+
+    if result.get("mode") == "sample fallback":
+        st.warning("Real backend unavailable; showing committed sample fallback.")
+
+    if rule_result["trigger_matched"]:
+        st.warning("Candidate Event: trigger matched local detection rule.")
+        if require_vlm_confirmation and rule_privacy == "allow_remote":
+            result["vlm_review_status"] = "queued"
+            result["sent_to_remote"] = True
+            result["final_answer_text"] = "Candidate event queued for workstation VLM review."
+        elif require_vlm_confirmation and rule_privacy == "local_only":
+            result["vlm_review_status"] = "failed"
+            result["route"] = "reject"
+            result["status"] = "privacy_blocked"
+            result["sent_to_remote"] = False
+            result["final_answer_text"] = (
+                "Privacy Blocked: semantic review would require sending the image to the remote workstation."
+            )
+            result["reasons"] = [
+                "privacy=local_only blocks remote semantic review for candidate event",
+                *result.get("reasons", []),
+            ]
+        else:
+            result["status"] = "local_alert"
+            result["alert"] = True
+            result["sent_to_remote"] = False
+            result["final_answer_text"] = "Local alert generated from YOLO TensorRT detection rule."
+    else:
+        result["sent_to_remote"] = False
+        st.caption(f"No candidate event triggered: {rule_result['reason']}")
+
+    _display_local_precheck(result, image_for_display, "Current snapshot with local YOLO monitoring boxes")
+    _display_routing_decision(result)
+    st.success("Route/location: Processed on Jetson" if result.get("route") == "local" else "Route/location recorded by policy")
+
+    event = _record_event(
+        source="live_monitor",
+        result=result,
+        task_type=task_type,
+        privacy=privacy,
+        image_source=_image_source_for_event(result, image_payload or str(SAMPLE_IMAGE)),
+        user_save=user_save,
+    )
+    st.session_state["last_live_monitor_result"] = result
+    st.session_state["last_monitor_refresh_at"] = time.monotonic()
+
+    if rule_result["trigger_matched"] and require_vlm_confirmation and rule_privacy == "allow_remote":
+        if event.get("image_path"):
+            review_queue = _ensure_review_worker(api_base_url)
+            review_queue.put(
+                {
+                    "event_id": event["event_id"],
+                    "image_path": event["image_path"],
+                    "prompt": rule.vlm_prompt,
+                    "max_tokens": int(max_tokens),
+                }
+            )
+            st.info("VLM review queued. Live Monitor can continue refreshing while review runs.")
+        else:
+            update_event(
+                event["event_id"],
+                {
+                    "vlm_review_status": "failed",
+                    "status": "failed",
+                    "error": "candidate event image was not available for VLM review",
+                },
+            )
+    if event.get("stored_event"):
+        st.caption(f"Recorded event {event['event_id']} in Event History.")
+    else:
+        st.caption("Updated latest snapshot only; this ordinary refresh was not retained as a long-term event.")
+
+
 def render_live_monitor(use_sample_mode: bool, api_base_url: str) -> None:
     st.subheader("Live Monitor")
     st.write("Capture snapshots and run the local Jetson YOLO TensorRT monitoring fast path.")
     st.caption(
-        "Auto refresh does not save every frame. Only alerts, triggered events, reviews, rejects, "
-        "backend errors/fallbacks, and user-saved events are retained."
+        "Auto refresh updates the latest snapshot only. Long-term history stores alerts, triggered events, "
+        "reviews, rejects, errors/fallbacks, assistant summaries, and user-saved snapshots."
     )
     if "vlm_review_queue" in st.session_state:
         st.caption(f"VLM review pending: {st.session_state['vlm_review_queue'].qsize()}")
+
+    monitoring_running = bool(st.session_state.get("monitoring_running", False))
+    st.session_state["monitor_page_active"] = True
 
     left, right = st.columns([2, 1])
     with left:
@@ -343,8 +490,6 @@ def render_live_monitor(use_sample_mode: bool, api_base_url: str) -> None:
             default_camera=not use_sample_mode,
             key_prefix="live",
         )
-        auto_refresh = st.toggle("Auto refresh", value=st.session_state.get("live_auto_refresh", False))
-        st.session_state["live_auto_refresh"] = auto_refresh
         interval_s = st.number_input(
             "Refresh interval seconds",
             min_value=1,
@@ -353,9 +498,28 @@ def render_live_monitor(use_sample_mode: bool, api_base_url: str) -> None:
             step=1,
             key="live_refresh_interval",
         )
-        if st.button("Stop monitoring"):
-            st.session_state["live_auto_refresh"] = False
-            st.rerun()
+        control_cols = st.columns(2)
+        with control_cols[0]:
+            if not monitoring_running:
+                if st.button("Start Monitoring", type="primary"):
+                    st.session_state["monitoring_running"] = True
+                    st.session_state["last_monitor_refresh_at"] = 0.0
+                    st.rerun()
+            else:
+                if st.button("Stop Monitoring", type="secondary"):
+                    st.session_state["monitoring_running"] = False
+                    st.rerun()
+        with control_cols[1]:
+            capture_once = st.button("Capture Once")
+        if monitoring_running:
+            st.success("Monitoring is running on this page.")
+        else:
+            st.info("Monitoring is stopped. Use Capture Once or Start Monitoring.")
+        if not hasattr(st, "fragment"):
+            st.caption(
+                "This Streamlit version does not support non-blocking auto refresh fragments. "
+                "Use Capture Once for manual snapshots."
+            )
     with right:
         with st.expander("Advanced routing settings"):
             task_type = st.selectbox("Task", ["detect", "classify"], index=0, key="live_task")
@@ -392,125 +556,39 @@ def render_live_monitor(use_sample_mode: bool, api_base_url: str) -> None:
             )
             user_save = st.checkbox("Save this snapshot as event", value=False)
 
-    manual_capture = st.button("Capture Snapshot / Run Local Detection", type="primary")
-    should_capture = manual_capture or st.session_state.get("live_auto_refresh", False)
-
-    if should_capture:
-        if use_sample_mode:
-            result = select_vision_sample(task_type, privacy, quality)
-            image_for_display = str(SAMPLE_IMAGE)
-        else:
-            backend_source = "camera" if image_source == "Jetson camera" else "upload"
-            with st.spinner("Calling Jetson Gateway for local monitoring detection."):
-                result = call_vision_backend(
-                    api_base_url,
-                    image_source=backend_source,
-                    image_path=image_payload or str(SAMPLE_IMAGE),
-                    task_type=task_type,
-                    privacy=privacy,
-                    quality=quality,
-                    latency_budget_ms=int(latency_budget_ms),
-                    prompt="",
-                    max_tokens=int(max_tokens),
-                )
-            image_for_display = _image_for_result(result, image_payload or str(SAMPLE_IMAGE))
-
-        frame_id = int(st.session_state.get("live_frame_id", 0)) + 1
-        st.session_state["live_frame_id"] = frame_id
-        signature = detection_signature(_detections(result))
-        previous_signature = st.session_state.get("last_detection_signature")
-        detection_changed = signature != previous_signature
-        st.session_state["last_detection_signature"] = signature
-
-        rule = MonitoringRule(
-            rule_name="live_monitor_watch_label",
-            enabled=rule_enabled,
-            target_labels=[label.strip() for label in watch_label.split(",")],
+    def capture() -> None:
+        _run_live_monitor_capture(
+            use_sample_mode=use_sample_mode,
+            api_base_url=api_base_url,
+            image_source=image_source,
+            image_payload=image_payload,
+            task_type=task_type,
+            privacy=privacy,
+            quality=quality,
+            latency_budget_ms=int(latency_budget_ms),
+            max_tokens=int(max_tokens),
+            rule_enabled=rule_enabled,
+            watch_label=watch_label,
             confidence_threshold=float(confidence_threshold),
             persistence_frames=int(persistence_frames),
             cooldown_seconds=float(cooldown_seconds),
             require_vlm_confirmation=bool(require_vlm_confirmation),
-            vlm_prompt=structured_vlm_prompt(vlm_prompt),
-            privacy=rule_privacy,
-        )
-        rule_state = st.session_state.setdefault("monitoring_rule_state", {})
-        rule_result = evaluate_rule(_detections(result), rule, rule_state)
-        result["frame_id"] = frame_id
-        result["detection_changed"] = detection_changed
-        result["trigger_matched"] = rule_result["trigger_matched"]
-        result["vlm_review_status"] = "none"
-
-        if result.get("mode") == "sample fallback":
-            st.warning("Real backend unavailable; showing committed sample fallback.")
-
-        if rule_result["trigger_matched"]:
-            st.warning("Candidate Event: trigger matched local detection rule.")
-            if require_vlm_confirmation and rule_privacy == "allow_remote":
-                result["vlm_review_status"] = "queued"
-                result["sent_to_remote"] = True
-                result["final_answer_text"] = "Candidate event queued for workstation VLM review."
-            elif require_vlm_confirmation and rule_privacy == "local_only":
-                result["vlm_review_status"] = "failed"
-                result["route"] = "reject"
-                result["status"] = "privacy_blocked"
-                result["sent_to_remote"] = False
-                result["final_answer_text"] = (
-                    "Privacy Blocked: semantic review would require sending the image to the remote workstation."
-                )
-                result["reasons"] = [
-                    "privacy=local_only blocks remote semantic review for candidate event",
-                    *result.get("reasons", []),
-                ]
-            else:
-                result["status"] = "local_alert"
-                result["alert"] = True
-                result["sent_to_remote"] = False
-                result["final_answer_text"] = "Local alert generated from YOLO TensorRT detection rule."
-        else:
-            result["sent_to_remote"] = False
-            st.caption(f"No candidate event triggered: {rule_result['reason']}")
-
-        _display_local_precheck(result, image_for_display, "Current snapshot with local YOLO monitoring boxes")
-        _display_routing_decision(result)
-        st.success("Route/location: Processed on Jetson" if result.get("route") == "local" else "Route/location recorded by policy")
-
-        event = _record_event(
-            source="live_monitor",
-            result=result,
-            task_type=task_type,
-            privacy=privacy,
-            image_source=_image_source_for_event(result, image_payload or str(SAMPLE_IMAGE)),
+            rule_privacy=rule_privacy,
+            vlm_prompt=vlm_prompt,
             user_save=user_save,
         )
-        if rule_result["trigger_matched"] and require_vlm_confirmation and rule_privacy == "allow_remote":
-            if event.get("image_path"):
-                review_queue = _ensure_review_worker(api_base_url)
-                review_queue.put(
-                    {
-                        "event_id": event["event_id"],
-                        "image_path": event["image_path"],
-                        "prompt": rule.vlm_prompt,
-                        "max_tokens": int(max_tokens),
-                    }
-                )
-                st.info("VLM review queued. Live Monitor can continue refreshing while review runs.")
-            else:
-                update_event(
-                    event["event_id"],
-                    {
-                        "vlm_review_status": "failed",
-                        "status": "failed",
-                        "error": "candidate event image was not available for VLM review",
-                    },
-                )
-        if event.get("stored_event"):
-            st.caption(f"Recorded event {event['event_id']} in Event History.")
-        else:
-            st.caption("Updated latest snapshot only; this ordinary refresh was not retained as a long-term event.")
 
-    if st.session_state.get("live_auto_refresh", False):
-        time.sleep(float(interval_s))
-        st.rerun()
+    if capture_once:
+        capture()
+
+    if st.session_state.get("monitoring_running", False) and hasattr(st, "fragment"):
+        run_every = f"{int(interval_s)}s"
+
+        @st.fragment(run_every=run_every)
+        def live_monitor_fragment() -> None:
+            capture()
+
+        live_monitor_fragment()
 
 
 def render_event_review(use_sample_mode: bool, api_base_url: str) -> None:
@@ -563,7 +641,8 @@ def render_event_review(use_sample_mode: bool, api_base_url: str) -> None:
         else:
             st.caption("Privacy-safe mode blocks semantic vision offload.")
 
-    if st.button("Ask about this event", type="primary"):
+    submitted = st.button("Ask about this event", type="primary")
+    if submitted:
         if use_sample_mode:
             result = select_vision_sample(task_type, privacy, quality)
             image_for_display = str(SAMPLE_IMAGE)
@@ -596,6 +675,9 @@ def render_event_review(use_sample_mode: bool, api_base_url: str) -> None:
 
         _display_local_precheck(result, image_for_display, "Event snapshot with local YOLO precheck boxes")
         _display_routing_decision(result)
+        st.markdown("#### VLM Review Status")
+        st.write(result.get("generation_status") or result.get("status") or "completed")
+        st.write(f"Sent to remote workstation: {bool(result.get('sent_to_remote'))}")
         _display_final_answer(result)
         event = _record_event(
             source="event_review",
@@ -605,7 +687,28 @@ def render_event_review(use_sample_mode: bool, api_base_url: str) -> None:
             prompt=prompt,
             image_source=_image_source_for_event(result, image_payload or str(SAMPLE_IMAGE)),
         )
+        st.session_state["latest_event_review_result"] = result
+        st.session_state["latest_event_review_image"] = image_for_display
+        st.session_state["latest_event_review_event_id"] = event["event_id"]
         st.caption(f"Recorded event {event['event_id']} in Event History.")
+    elif st.session_state.get("latest_event_review_result"):
+        st.info("Showing the latest Event Review result from this session.")
+        result = st.session_state["latest_event_review_result"]
+        image_for_display = st.session_state.get("latest_event_review_image", str(SAMPLE_IMAGE))
+        _display_local_precheck(result, image_for_display, "Latest reviewed event with local YOLO precheck boxes")
+        _display_routing_decision(result)
+        st.markdown("#### VLM Review Status")
+        st.write(result.get("generation_status") or result.get("status") or "completed")
+        st.write(f"Sent to remote workstation: {bool(result.get('sent_to_remote'))}")
+        _display_final_answer(result)
+        if st.button("Refresh Review Status"):
+            event_id = st.session_state.get("latest_event_review_event_id")
+            if event_id:
+                matches = [event for event in load_recent_events(limit=100) if event.get("event_id") == event_id]
+                if matches:
+                    st.json(matches[0])
+                else:
+                    st.warning("Review event is no longer in retained history.")
 
 
 def render_monitoring_assistant(use_sample_mode: bool, api_base_url: str) -> None:
@@ -639,7 +742,8 @@ def render_monitoring_assistant(use_sample_mode: bool, api_base_url: str) -> Non
         max_tokens = st.number_input("Max output tokens", min_value=32, max_value=2048, value=1024, step=32)
         timeout_s = st.number_input("Request timeout seconds", min_value=5, max_value=180, value=60, step=5)
 
-    if st.button("Ask Monitoring Assistant", type="primary"):
+    submitted = st.button("Ask Monitoring Assistant", type="primary")
+    if submitted:
         prompt = (
             "You are the Monitoring Assistant for a Jetson local-first edge monitoring gateway. "
             "Use the recent event context when relevant.\n\n"
@@ -666,7 +770,8 @@ def render_monitoring_assistant(use_sample_mode: bool, api_base_url: str) -> Non
             st.error("Model did not produce a final answer before the output limit.")
             with st.expander("Debug raw model output"):
                 st.text_area("Raw output", value=result.get("raw_output", ""), height=220)
-        st.text_area("Assistant answer", value=result.get("full_response") or result.get("response_preview", ""), height=260)
+        else:
+            st.text_area("Assistant answer", value=result.get("full_response") or result.get("response_preview", ""), height=260)
         event = _record_event(
             source="monitoring_assistant",
             result=result,
@@ -674,7 +779,18 @@ def render_monitoring_assistant(use_sample_mode: bool, api_base_url: str) -> Non
             privacy=privacy,
             prompt=user_prompt,
         )
+        st.session_state["latest_assistant_result"] = result
         st.caption(f"Recorded event {event['event_id']} in Event History.")
+    elif st.session_state.get("latest_assistant_result"):
+        st.info("Showing the latest Monitoring Assistant answer from this session.")
+        result = st.session_state["latest_assistant_result"]
+        _display_routing_decision(result)
+        if result.get("generation_status") == "incomplete_generation":
+            st.error("Model did not produce a final answer before the output limit.")
+            with st.expander("Debug raw model output"):
+                st.text_area("Raw output", value=result.get("raw_output", ""), height=220)
+        else:
+            st.text_area("Assistant answer", value=result.get("full_response") or result.get("response_preview", ""), height=260)
 
 
 def render_event_history() -> None:
@@ -807,27 +923,30 @@ def render_model_policy() -> None:
 
 def main() -> None:
     use_sample_mode, api_base_url = render_header()
-    tabs = st.tabs(
-        [
-            "Live Monitor",
-            "Event Review",
-            "Monitoring Assistant",
-            "Event History",
-            "System Status",
-            "Model Policy",
-        ]
-    )
-    with tabs[0]:
+    pages = [
+        "Live Monitor",
+        "Event Review",
+        "Monitoring Assistant",
+        "Event History",
+        "System Status",
+        "Model Policy",
+    ]
+    page = st.sidebar.radio("Workbench page", pages, index=0)
+    st.session_state["monitor_page_active"] = page == "Live Monitor"
+    if page != "Live Monitor" and st.session_state.get("monitoring_running"):
+        st.sidebar.info("Live Monitor is paused while another page is active.")
+
+    if page == "Live Monitor":
         render_live_monitor(use_sample_mode, api_base_url)
-    with tabs[1]:
+    elif page == "Event Review":
         render_event_review(use_sample_mode, api_base_url)
-    with tabs[2]:
+    elif page == "Monitoring Assistant":
         render_monitoring_assistant(use_sample_mode, api_base_url)
-    with tabs[3]:
+    elif page == "Event History":
         render_event_history()
-    with tabs[4]:
+    elif page == "System Status":
         render_system_status(use_sample_mode, api_base_url)
-    with tabs[5]:
+    elif page == "Model Policy":
         render_model_policy()
 
 
