@@ -23,6 +23,7 @@ runtime_data/
 __pycache__/
 *.py[cod]
 .venv/
+.venv-vlm/
 venv/
 .env
 .env.*
