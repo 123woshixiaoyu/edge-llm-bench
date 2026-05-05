@@ -1,0 +1,22 @@
+model_name,model_id,model_size,platform,prompt_variant,n,avg_latency_ms,p50_latency_ms,p95_latency_ms,strict_json_valid_rate,relaxed_json_valid_rate,yes_no_parse_rate,retry_success_rate,overall_parse_success_rate,semantic_match_rate,failure_examples,recommendation
+SmolVLM2-500M-Video-Instruct,HuggingFaceTB/SmolVLM2-500M-Video-Instruct,500M,rtx_5090_wsl,strict_json,12,435.09,290.55,568.85,0.0,0.0,0.75,,0.75,0.0,The bed is empty and the room is dark. | The monitor is showing a room with a bed and a bowl on the floor. | A person is working on a computer with a white game controller.,not_suitable_for_automated_verifier
+SmolVLM2-500M-Video-Instruct,HuggingFaceTB/SmolVLM2-500M-Video-Instruct,500M,rtx_5090_wsl,strict_json_fewshot,12,301.13,270.73,403.73,0.0,0.0,0.75,,0.75,1.0,A chair is visible in a room. | A chair is visible in a room. | A chair is visible in a room.,usable_with_retry_or_human_review
+SmolVLM2-500M-Video-Instruct,HuggingFaceTB/SmolVLM2-500M-Video-Instruct,500M,rtx_5090_wsl,yes_no_token,12,273.79,269.78,289.4,0.0,0.0,1.0,,1.0,0.667,,usable_with_retry_or_human_review
+SmolVLM2-500M-Video-Instruct,HuggingFaceTB/SmolVLM2-500M-Video-Instruct,500M,rtx_5090_wsl,final_line,12,277.22,273.65,297.31,0.0,0.0,1.0,,1.0,0.833,,event_verifier_candidate
+SmolVLM2-500M-Video-Instruct,HuggingFaceTB/SmolVLM2-500M-Video-Instruct,500M,rtx_5090_wsl,retry_strict,12,1579.24,1362.19,2155.1,0.417,0.417,0.5,0.417,0.917,0.0,The monitor is showing a room with a bed and a bowl on the floor.,not_suitable_for_automated_verifier
+SmolVLM2-256M-Video-Instruct,HuggingFaceTB/SmolVLM2-256M-Video-Instruct,256M,rtx_5090_wsl,strict_json,12,360.6,345.1,439.14,0.0,0.0,0.5,,0.5,0.5,The image shows a person falling or lying on the ground. | The monitor is showing a monitor screen | The image shows a person falling or lying on the ground.,not_suitable_for_automated_verifier
+SmolVLM2-256M-Video-Instruct,HuggingFaceTB/SmolVLM2-256M-Video-Instruct,256M,rtx_5090_wsl,strict_json_fewshot,12,611.65,516.57,664.65,0.75,0.75,0.583,,0.833,0.333,"The image shows a person falling.
+
+{
+    ""type"":""json"",
+    ""data"":[
+        {
+  | The image shows a person falling or lying on the ground.",not_suitable_for_automated_verifier
+SmolVLM2-256M-Video-Instruct,HuggingFaceTB/SmolVLM2-256M-Video-Instruct,256M,rtx_5090_wsl,yes_no_token,12,295.16,303.61,320.62,0.0,0.0,0.5,,0.5,0.5,The answer is lying | does not need attention | The answer is falling,not_suitable_for_automated_verifier
+SmolVLM2-256M-Video-Instruct,HuggingFaceTB/SmolVLM2-256M-Video-Instruct,256M,rtx_5090_wsl,final_line,12,273.66,272.61,295.09,0.0,0.0,1.0,,1.0,1.0,,event_verifier_candidate
+SmolVLM2-256M-Video-Instruct,HuggingFaceTB/SmolVLM2-256M-Video-Instruct,256M,rtx_5090_wsl,retry_strict,12,1762.9,2047.51,2213.26,0.25,0.25,0.5,0.25,0.75,0.5,The image shows a person falling or lying on the ground. | The image shows a person falling or lying on the ground. | The image shows a person falling or lying on the ground.,not_suitable_for_automated_verifier
+SmolVLM2-2.2B-Instruct,HuggingFaceTB/SmolVLM2-2.2B-Instruct,2.2B,rtx_5090_wsl,strict_json,12,528.58,503.31,676.09,0.0,0.0,0.75,,0.75,1.0,The monitoring frame is a white plastic chair with a black cushion. | The monitoring frame is a white table with a grey cushion on it. | The monitoring frame is a white gaming console with a lot of wires connected to ,usable_with_retry_or_human_review
+SmolVLM2-2.2B-Instruct,HuggingFaceTB/SmolVLM2-2.2B-Instruct,2.2B,rtx_5090_wsl,strict_json_fewshot,12,557.51,585.67,730.76,0.25,0.25,0.75,,0.75,1.0,A chair is visible in a room. | A chair is visible in a room. | A white game controller is connected to a computer.,usable_with_retry_or_human_review
+SmolVLM2-2.2B-Instruct,HuggingFaceTB/SmolVLM2-2.2B-Instruct,2.2B,rtx_5090_wsl,yes_no_token,12,481.51,480.44,502.92,0.0,0.0,1.0,,1.0,0.667,,usable_with_retry_or_human_review
+SmolVLM2-2.2B-Instruct,HuggingFaceTB/SmolVLM2-2.2B-Instruct,2.2B,rtx_5090_wsl,final_line,12,569.05,566.36,665.4,0.0,0.0,1.0,,1.0,1.0,,event_verifier_candidate
+SmolVLM2-2.2B-Instruct,HuggingFaceTB/SmolVLM2-2.2B-Instruct,2.2B,rtx_5090_wsl,retry_strict,12,1480.05,1446.29,1953.56,0.917,0.917,0.417,1.0,1.0,0.5,,not_suitable_for_automated_verifier

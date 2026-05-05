@@ -1,0 +1,332 @@
+model_name,model_id,model_size,platform,prompt_variant,image_path,task,max_new_tokens,input_resolution,load_latency_ms,latency_total_ms,generate_ms,peak_gpu_memory_mb,output_text,retry_output_text,strict_json_valid,relaxed_json_valid,yes_no_parse_valid,parsed_answer,expected_answer,semantic_match,parse_method,retry_used,error,status
+SmolVLM2-500M-Video-Instruct,HuggingFaceTB/SmolVLM2-500M-Video-Instruct,500M,rtx_5090_wsl,strict_json,/mnt/d/AI/edge-llm-bench/results/figures/camera_v05_positive_detection.jpg,lipstick_presence,96,448x252,7364.79,1418.7,1217.81,1346.35,yes,,False,False,True,yes,no,False,yes_no,False,,success
+SmolVLM2-500M-Video-Instruct,HuggingFaceTB/SmolVLM2-500M-Video-Instruct,500M,rtx_5090_wsl,strict_json_fewshot,/mnt/d/AI/edge-llm-bench/results/figures/camera_v05_positive_detection.jpg,lipstick_presence,96,448x252,7364.79,293.42,102.74,1347.35,no,,False,False,True,no,no,True,yes_no,False,,success
+SmolVLM2-500M-Video-Instruct,HuggingFaceTB/SmolVLM2-500M-Video-Instruct,500M,rtx_5090_wsl,yes_no_token,/mnt/d/AI/edge-llm-bench/results/figures/camera_v05_positive_detection.jpg,lipstick_presence,96,448x252,7364.79,267.53,109.17,1347.35,yes,,False,False,True,yes,no,False,yes_no,False,,success
+SmolVLM2-500M-Video-Instruct,HuggingFaceTB/SmolVLM2-500M-Video-Instruct,500M,rtx_5090_wsl,final_line,/mnt/d/AI/edge-llm-bench/results/figures/camera_v05_positive_detection.jpg,lipstick_presence,96,448x252,7364.79,273.65,104.64,1347.35,no,,False,False,True,no,no,True,yes_no,False,,success
+SmolVLM2-500M-Video-Instruct,HuggingFaceTB/SmolVLM2-500M-Video-Instruct,500M,rtx_5090_wsl,retry_strict,/mnt/d/AI/edge-llm-bench/results/figures/camera_v05_positive_detection.jpg,lipstick_presence,96,448x252,7364.79,1201.0,109.26,1347.35,yes,"{
+  ""answer"": ""yes"",
+  ""confidence"": 100,
+  ""reason"": ""The bed is white and has a black headboard. It's in a room with a bed and a nightstand.",False,False,True,yes,no,False,yes_no,True,,success
+SmolVLM2-500M-Video-Instruct,HuggingFaceTB/SmolVLM2-500M-Video-Instruct,500M,rtx_5090_wsl,strict_json,/mnt/d/AI/edge-llm-bench/results/figures/camera_v05_positive_detection.jpg,person_fall,96,448x252,7364.79,275.34,108.81,1347.35,yes,,False,False,True,yes,no,False,yes_no,False,,success
+SmolVLM2-500M-Video-Instruct,HuggingFaceTB/SmolVLM2-500M-Video-Instruct,500M,rtx_5090_wsl,strict_json_fewshot,/mnt/d/AI/edge-llm-bench/results/figures/camera_v05_positive_detection.jpg,person_fall,96,448x252,7364.79,268.2,108.43,1347.35,no,,False,False,True,no,no,True,yes_no,False,,success
+SmolVLM2-500M-Video-Instruct,HuggingFaceTB/SmolVLM2-500M-Video-Instruct,500M,rtx_5090_wsl,yes_no_token,/mnt/d/AI/edge-llm-bench/results/figures/camera_v05_positive_detection.jpg,person_fall,96,448x252,7364.79,274.76,111.74,1347.35,no,,False,False,True,no,no,True,yes_no,False,,success
+SmolVLM2-500M-Video-Instruct,HuggingFaceTB/SmolVLM2-500M-Video-Instruct,500M,rtx_5090_wsl,final_line,/mnt/d/AI/edge-llm-bench/results/figures/camera_v05_positive_detection.jpg,person_fall,96,448x252,7364.79,297.31,108.25,1347.35,no,,False,False,True,no,no,True,yes_no,False,,success
+SmolVLM2-500M-Video-Instruct,HuggingFaceTB/SmolVLM2-500M-Video-Instruct,500M,rtx_5090_wsl,retry_strict,/mnt/d/AI/edge-llm-bench/results/figures/camera_v05_positive_detection.jpg,person_fall,96,448x252,7364.79,1272.73,109.25,1347.35,yes,"{
+  ""answer"": ""yes"",
+  ""confidence"": 100,
+  ""reason"": ""The bed is white and has a black headboard. It's in a room with a bed and a nightstand.",False,False,True,yes,no,False,yes_no,True,,success
+SmolVLM2-500M-Video-Instruct,HuggingFaceTB/SmolVLM2-500M-Video-Instruct,500M,rtx_5090_wsl,strict_json,/mnt/d/AI/edge-llm-bench/results/figures/camera_v05_positive_detection.jpg,abnormal_scene,96,448x252,7364.79,261.31,105.28,1347.35,yes,,False,False,True,yes,,,yes_no,False,,success
+SmolVLM2-500M-Video-Instruct,HuggingFaceTB/SmolVLM2-500M-Video-Instruct,500M,rtx_5090_wsl,strict_json_fewshot,/mnt/d/AI/edge-llm-bench/results/figures/camera_v05_positive_detection.jpg,abnormal_scene,96,448x252,7364.79,262.69,107.8,1347.35,no,,False,False,True,no,,,yes_no,False,,success
+SmolVLM2-500M-Video-Instruct,HuggingFaceTB/SmolVLM2-500M-Video-Instruct,500M,rtx_5090_wsl,yes_no_token,/mnt/d/AI/edge-llm-bench/results/figures/camera_v05_positive_detection.jpg,abnormal_scene,96,448x252,7364.79,287.67,111.42,1347.35,no,,False,False,True,no,,,yes_no,False,,success
+SmolVLM2-500M-Video-Instruct,HuggingFaceTB/SmolVLM2-500M-Video-Instruct,500M,rtx_5090_wsl,final_line,/mnt/d/AI/edge-llm-bench/results/figures/camera_v05_positive_detection.jpg,abnormal_scene,96,448x252,7364.79,266.9,108.7,1347.35,no,,False,False,True,no,,,yes_no,False,,success
+SmolVLM2-500M-Video-Instruct,HuggingFaceTB/SmolVLM2-500M-Video-Instruct,500M,rtx_5090_wsl,retry_strict,/mnt/d/AI/edge-llm-bench/results/figures/camera_v05_positive_detection.jpg,abnormal_scene,96,448x252,7364.79,1240.92,103.47,1347.35,yes,"{
+  ""answer"": ""yes"",
+  ""confidence"": 100,
+  ""reason"": ""The bed is white and has a black headboard. It's in a room with a bed and a nightstand.",False,False,True,yes,,,yes_no,True,,success
+SmolVLM2-500M-Video-Instruct,HuggingFaceTB/SmolVLM2-500M-Video-Instruct,500M,rtx_5090_wsl,strict_json,/mnt/d/AI/edge-llm-bench/results/figures/camera_v05_positive_detection.jpg,general_description,96,448x252,7364.79,437.78,277.27,1347.35,The bed is empty and the room is dark.,,False,False,False,,,,failed,False,output did not match requested protocol,parse_failed
+SmolVLM2-500M-Video-Instruct,HuggingFaceTB/SmolVLM2-500M-Video-Instruct,500M,rtx_5090_wsl,strict_json_fewshot,/mnt/d/AI/edge-llm-bench/results/figures/camera_v05_positive_detection.jpg,general_description,96,448x252,7364.79,410.15,226.29,1347.35,A chair is visible in a room.,,False,False,False,,,,failed,False,output did not match requested protocol,parse_failed
+SmolVLM2-500M-Video-Instruct,HuggingFaceTB/SmolVLM2-500M-Video-Instruct,500M,rtx_5090_wsl,yes_no_token,/mnt/d/AI/edge-llm-bench/results/figures/camera_v05_positive_detection.jpg,general_description,96,448x252,7364.79,267.46,110.59,1347.35,yes,,False,False,True,yes,,,yes_no,False,,success
+SmolVLM2-500M-Video-Instruct,HuggingFaceTB/SmolVLM2-500M-Video-Instruct,500M,rtx_5090_wsl,final_line,/mnt/d/AI/edge-llm-bench/results/figures/camera_v05_positive_detection.jpg,general_description,96,448x252,7364.79,276.72,115.6,1347.35,yes,,False,False,True,yes,,,yes_no,False,,success
+SmolVLM2-500M-Video-Instruct,HuggingFaceTB/SmolVLM2-500M-Video-Instruct,500M,rtx_5090_wsl,retry_strict,/mnt/d/AI/edge-llm-bench/results/figures/camera_v05_positive_detection.jpg,general_description,96,448x252,7364.79,1229.43,658.95,1347.35,The bed is empty and the room is dark.,"{
+  ""answer"": ""white"",
+  ""confidence"": 100,
+  ""reason"": ""The bed is empty and the room is dark.""
+}",True,True,False,white,,,retry,True,,success
+SmolVLM2-500M-Video-Instruct,HuggingFaceTB/SmolVLM2-500M-Video-Instruct,500M,rtx_5090_wsl,strict_json,/mnt/d/AI/edge-llm-bench/results/figures/camera_v05_real_vlm_sample.jpg,lipstick_presence,96,448x252,7364.79,290.55,107.24,1347.35,yes,,False,False,True,yes,no,False,yes_no,False,,success
+SmolVLM2-500M-Video-Instruct,HuggingFaceTB/SmolVLM2-500M-Video-Instruct,500M,rtx_5090_wsl,strict_json_fewshot,/mnt/d/AI/edge-llm-bench/results/figures/camera_v05_real_vlm_sample.jpg,lipstick_presence,96,448x252,7364.79,245.83,100.3,1347.35,no,,False,False,True,no,no,True,yes_no,False,,success
+SmolVLM2-500M-Video-Instruct,HuggingFaceTB/SmolVLM2-500M-Video-Instruct,500M,rtx_5090_wsl,yes_no_token,/mnt/d/AI/edge-llm-bench/results/figures/camera_v05_real_vlm_sample.jpg,lipstick_presence,96,448x252,7364.79,269.42,113.43,1347.35,yes,,False,False,True,yes,no,False,yes_no,False,,success
+SmolVLM2-500M-Video-Instruct,HuggingFaceTB/SmolVLM2-500M-Video-Instruct,500M,rtx_5090_wsl,final_line,/mnt/d/AI/edge-llm-bench/results/figures/camera_v05_real_vlm_sample.jpg,lipstick_presence,96,448x252,7364.79,267.93,107.69,1347.35,no,,False,False,True,no,no,True,yes_no,False,,success
+SmolVLM2-500M-Video-Instruct,HuggingFaceTB/SmolVLM2-500M-Video-Instruct,500M,rtx_5090_wsl,retry_strict,/mnt/d/AI/edge-llm-bench/results/figures/camera_v05_real_vlm_sample.jpg,lipstick_presence,96,448x252,7364.79,2109.48,108.67,1347.35,yes,"{
+  ""answer"": ""yes"",
+  ""confidence"": 100,
+  ""reason"": ""The bowl is on the bed. The bed is in the room. The bed is in the room. The bed is in the room. The bed is in the room. The bed is in the room. The bed is in the room. The bed is in the room. The bed is in the room. The bed is in the room. The bed is in",False,False,True,yes,no,False,yes_no,True,,success
+SmolVLM2-500M-Video-Instruct,HuggingFaceTB/SmolVLM2-500M-Video-Instruct,500M,rtx_5090_wsl,strict_json,/mnt/d/AI/edge-llm-bench/results/figures/camera_v05_real_vlm_sample.jpg,person_fall,96,448x252,7364.79,299.08,109.45,1347.35,yes,,False,False,True,yes,no,False,yes_no,False,,success
+SmolVLM2-500M-Video-Instruct,HuggingFaceTB/SmolVLM2-500M-Video-Instruct,500M,rtx_5090_wsl,strict_json_fewshot,/mnt/d/AI/edge-llm-bench/results/figures/camera_v05_real_vlm_sample.jpg,person_fall,96,448x252,7364.79,271.78,113.76,1347.35,no,,False,False,True,no,no,True,yes_no,False,,success
+SmolVLM2-500M-Video-Instruct,HuggingFaceTB/SmolVLM2-500M-Video-Instruct,500M,rtx_5090_wsl,yes_no_token,/mnt/d/AI/edge-llm-bench/results/figures/camera_v05_real_vlm_sample.jpg,person_fall,96,448x252,7364.79,266.57,111.94,1347.35,no,,False,False,True,no,no,True,yes_no,False,,success
+SmolVLM2-500M-Video-Instruct,HuggingFaceTB/SmolVLM2-500M-Video-Instruct,500M,rtx_5090_wsl,final_line,/mnt/d/AI/edge-llm-bench/results/figures/camera_v05_real_vlm_sample.jpg,person_fall,96,448x252,7364.79,300.58,115.13,1347.35,no,,False,False,True,no,no,True,yes_no,False,,success
+SmolVLM2-500M-Video-Instruct,HuggingFaceTB/SmolVLM2-500M-Video-Instruct,500M,rtx_5090_wsl,retry_strict,/mnt/d/AI/edge-llm-bench/results/figures/camera_v05_real_vlm_sample.jpg,person_fall,96,448x252,7364.79,2107.86,107.64,1347.35,yes,"{
+  ""answer"": ""yes"",
+  ""confidence"": 100,
+  ""reason"": ""The bowl is on the bed. The bed is in the room. The bed is in the room. The bed is in the room. The bed is in the room. The bed is in the room. The bed is in the room. The bed is in the room. The bed is in the room. The bed is in the room. The bed is in",False,False,True,yes,no,False,yes_no,True,,success
+SmolVLM2-500M-Video-Instruct,HuggingFaceTB/SmolVLM2-500M-Video-Instruct,500M,rtx_5090_wsl,strict_json,/mnt/d/AI/edge-llm-bench/results/figures/camera_v05_real_vlm_sample.jpg,abnormal_scene,96,448x252,7364.79,290.22,110.91,1347.35,yes,,False,False,True,yes,,,yes_no,False,,success
+SmolVLM2-500M-Video-Instruct,HuggingFaceTB/SmolVLM2-500M-Video-Instruct,500M,rtx_5090_wsl,strict_json_fewshot,/mnt/d/AI/edge-llm-bench/results/figures/camera_v05_real_vlm_sample.jpg,abnormal_scene,96,448x252,7364.79,270.19,113.04,1347.35,no,,False,False,True,no,,,yes_no,False,,success
+SmolVLM2-500M-Video-Instruct,HuggingFaceTB/SmolVLM2-500M-Video-Instruct,500M,rtx_5090_wsl,yes_no_token,/mnt/d/AI/edge-llm-bench/results/figures/camera_v05_real_vlm_sample.jpg,abnormal_scene,96,448x252,7364.79,270.05,112.63,1347.35,no,,False,False,True,no,,,yes_no,False,,success
+SmolVLM2-500M-Video-Instruct,HuggingFaceTB/SmolVLM2-500M-Video-Instruct,500M,rtx_5090_wsl,final_line,/mnt/d/AI/edge-llm-bench/results/figures/camera_v05_real_vlm_sample.jpg,abnormal_scene,96,448x252,7364.79,272.29,112.08,1347.35,no,,False,False,True,no,,,yes_no,False,,success
+SmolVLM2-500M-Video-Instruct,HuggingFaceTB/SmolVLM2-500M-Video-Instruct,500M,rtx_5090_wsl,retry_strict,/mnt/d/AI/edge-llm-bench/results/figures/camera_v05_real_vlm_sample.jpg,abnormal_scene,96,448x252,7364.79,2155.1,110.92,1347.35,yes,"{
+  ""answer"": ""yes"",
+  ""confidence"": 100,
+  ""reason"": ""The bowl is on the bed. The bed is in the room. The bed is in the room. The bed is in the room. The bed is in the room. The bed is in the room. The bed is in the room. The bed is in the room. The bed is in the room. The bed is in the room. The bed is in",False,False,True,yes,,,yes_no,True,,success
+SmolVLM2-500M-Video-Instruct,HuggingFaceTB/SmolVLM2-500M-Video-Instruct,500M,rtx_5090_wsl,strict_json,/mnt/d/AI/edge-llm-bench/results/figures/camera_v05_real_vlm_sample.jpg,general_description,96,448x252,7364.79,568.85,384.2,1347.35,The monitor is showing a room with a bed and a bowl on the floor.,,False,False,False,,,,failed,False,output did not match requested protocol,parse_failed
+SmolVLM2-500M-Video-Instruct,HuggingFaceTB/SmolVLM2-500M-Video-Instruct,500M,rtx_5090_wsl,strict_json_fewshot,/mnt/d/AI/edge-llm-bench/results/figures/camera_v05_real_vlm_sample.jpg,general_description,96,448x252,7364.79,403.73,232.23,1347.35,A chair is visible in a room.,,False,False,False,,,,failed,False,output did not match requested protocol,parse_failed
+SmolVLM2-500M-Video-Instruct,HuggingFaceTB/SmolVLM2-500M-Video-Instruct,500M,rtx_5090_wsl,yes_no_token,/mnt/d/AI/edge-llm-bench/results/figures/camera_v05_real_vlm_sample.jpg,general_description,96,448x252,7364.79,289.4,117.2,1347.35,yes,,False,False,True,yes,,,yes_no,False,,success
+SmolVLM2-500M-Video-Instruct,HuggingFaceTB/SmolVLM2-500M-Video-Instruct,500M,rtx_5090_wsl,final_line,/mnt/d/AI/edge-llm-bench/results/figures/camera_v05_real_vlm_sample.jpg,general_description,96,448x252,7364.79,281.71,123.87,1347.35,no,,False,False,True,no,,,yes_no,False,,success
+SmolVLM2-500M-Video-Instruct,HuggingFaceTB/SmolVLM2-500M-Video-Instruct,500M,rtx_5090_wsl,retry_strict,/mnt/d/AI/edge-llm-bench/results/figures/camera_v05_real_vlm_sample.jpg,general_description,96,448x252,7364.79,2370.73,370.32,1347.35,The monitor is showing a room with a bed and a bowl on the floor.,"{
+    ""room"": {
+        ""bed"": {
+            ""size"": ""square"",
+            ""color"": ""white"",
+            ""wall"": ""white"",
+            ""floor"": ""white"",
+            ""wall_to_floor"": ""floor"",
+            ""wall_to_wall"": ""floor"",
+            ""wall_to_wall_wall"": ""wall"",
+            ""wall_to_floor_wall"": ""wall"",
+            ""wall_to_floor_wall",False,False,False,,,,failed,True,output did not match requested protocol,parse_failed
+SmolVLM2-500M-Video-Instruct,HuggingFaceTB/SmolVLM2-500M-Video-Instruct,500M,rtx_5090_wsl,strict_json,/mnt/d/AI/edge-llm-bench/results/figures/camera_v05_sample.jpg,lipstick_presence,96,448x252,7364.79,287.75,112.3,1347.35,yes,,False,False,True,yes,no,False,yes_no,False,,success
+SmolVLM2-500M-Video-Instruct,HuggingFaceTB/SmolVLM2-500M-Video-Instruct,500M,rtx_5090_wsl,strict_json_fewshot,/mnt/d/AI/edge-llm-bench/results/figures/camera_v05_sample.jpg,lipstick_presence,96,448x252,7364.79,265.21,111.38,1347.35,no,,False,False,True,no,no,True,yes_no,False,,success
+SmolVLM2-500M-Video-Instruct,HuggingFaceTB/SmolVLM2-500M-Video-Instruct,500M,rtx_5090_wsl,yes_no_token,/mnt/d/AI/edge-llm-bench/results/figures/camera_v05_sample.jpg,lipstick_presence,96,448x252,7364.79,290.53,119.16,1347.35,no,,False,False,True,no,no,True,yes_no,False,,success
+SmolVLM2-500M-Video-Instruct,HuggingFaceTB/SmolVLM2-500M-Video-Instruct,500M,rtx_5090_wsl,final_line,/mnt/d/AI/edge-llm-bench/results/figures/camera_v05_sample.jpg,lipstick_presence,96,448x252,7364.79,271.6,117.96,1347.35,yes,,False,False,True,yes,no,False,yes_no,False,,success
+SmolVLM2-500M-Video-Instruct,HuggingFaceTB/SmolVLM2-500M-Video-Instruct,500M,rtx_5090_wsl,retry_strict,/mnt/d/AI/edge-llm-bench/results/figures/camera_v05_sample.jpg,lipstick_presence,96,448x252,7364.79,1367.48,934.96,1347.35,yes,"{
+  ""answer"": ""yes"",
+  ""confidence"": 100,
+  ""reason"": ""The game controller is being used by the player. The player is interacting with the game by pressing the buttons on the controller.""
+}",True,True,False,yes,no,False,retry,True,,success
+SmolVLM2-500M-Video-Instruct,HuggingFaceTB/SmolVLM2-500M-Video-Instruct,500M,rtx_5090_wsl,strict_json,/mnt/d/AI/edge-llm-bench/results/figures/camera_v05_sample.jpg,person_fall,96,448x252,7364.79,285.74,118.16,1347.35,yes,,False,False,True,yes,no,False,yes_no,False,,success
+SmolVLM2-500M-Video-Instruct,HuggingFaceTB/SmolVLM2-500M-Video-Instruct,500M,rtx_5090_wsl,strict_json_fewshot,/mnt/d/AI/edge-llm-bench/results/figures/camera_v05_sample.jpg,person_fall,96,448x252,7364.79,270.73,117.62,1347.35,no,,False,False,True,no,no,True,yes_no,False,,success
+SmolVLM2-500M-Video-Instruct,HuggingFaceTB/SmolVLM2-500M-Video-Instruct,500M,rtx_5090_wsl,yes_no_token,/mnt/d/AI/edge-llm-bench/results/figures/camera_v05_sample.jpg,person_fall,96,448x252,7364.79,269.78,117.22,1347.35,no,,False,False,True,no,no,True,yes_no,False,,success
+SmolVLM2-500M-Video-Instruct,HuggingFaceTB/SmolVLM2-500M-Video-Instruct,500M,rtx_5090_wsl,final_line,/mnt/d/AI/edge-llm-bench/results/figures/camera_v05_sample.jpg,person_fall,96,448x252,7364.79,262.85,114.35,1347.35,no,,False,False,True,no,no,True,yes_no,False,,success
+SmolVLM2-500M-Video-Instruct,HuggingFaceTB/SmolVLM2-500M-Video-Instruct,500M,rtx_5090_wsl,retry_strict,/mnt/d/AI/edge-llm-bench/results/figures/camera_v05_sample.jpg,person_fall,96,448x252,7364.79,1352.56,928.48,1347.35,yes,"{
+  ""answer"": ""yes"",
+  ""confidence"": 100,
+  ""reason"": ""The game controller is being used by the player. The player is interacting with the game by pressing the buttons on the controller.""
+}",True,True,False,yes,no,False,retry,True,,success
+SmolVLM2-500M-Video-Instruct,HuggingFaceTB/SmolVLM2-500M-Video-Instruct,500M,rtx_5090_wsl,strict_json,/mnt/d/AI/edge-llm-bench/results/figures/camera_v05_sample.jpg,abnormal_scene,96,448x252,7364.79,287.95,115.58,1347.35,yes,,False,False,True,yes,,,yes_no,False,,success
+SmolVLM2-500M-Video-Instruct,HuggingFaceTB/SmolVLM2-500M-Video-Instruct,500M,rtx_5090_wsl,strict_json_fewshot,/mnt/d/AI/edge-llm-bench/results/figures/camera_v05_sample.jpg,abnormal_scene,96,448x252,7364.79,269.24,113.68,1347.35,no,,False,False,True,no,,,yes_no,False,,success
+SmolVLM2-500M-Video-Instruct,HuggingFaceTB/SmolVLM2-500M-Video-Instruct,500M,rtx_5090_wsl,yes_no_token,/mnt/d/AI/edge-llm-bench/results/figures/camera_v05_sample.jpg,abnormal_scene,96,448x252,7364.79,269.27,114.37,1347.35,yes,,False,False,True,yes,,,yes_no,False,,success
+SmolVLM2-500M-Video-Instruct,HuggingFaceTB/SmolVLM2-500M-Video-Instruct,500M,rtx_5090_wsl,final_line,/mnt/d/AI/edge-llm-bench/results/figures/camera_v05_sample.jpg,abnormal_scene,96,448x252,7364.79,269.12,113.28,1347.35,no,,False,False,True,no,,,yes_no,False,,success
+SmolVLM2-500M-Video-Instruct,HuggingFaceTB/SmolVLM2-500M-Video-Instruct,500M,rtx_5090_wsl,retry_strict,/mnt/d/AI/edge-llm-bench/results/figures/camera_v05_sample.jpg,abnormal_scene,96,448x252,7364.79,1362.19,929.26,1347.35,yes,"{
+  ""answer"": ""yes"",
+  ""confidence"": 100,
+  ""reason"": ""The game controller is being used by the player. The player is interacting with the game by pressing the buttons on the controller.""
+}",True,True,False,yes,,,retry,True,,success
+SmolVLM2-500M-Video-Instruct,HuggingFaceTB/SmolVLM2-500M-Video-Instruct,500M,rtx_5090_wsl,strict_json,/mnt/d/AI/edge-llm-bench/results/figures/camera_v05_sample.jpg,general_description,96,448x252,7364.79,517.76,346.3,1347.35,A person is working on a computer with a white game controller.,,False,False,False,,,,failed,False,output did not match requested protocol,parse_failed
+SmolVLM2-500M-Video-Instruct,HuggingFaceTB/SmolVLM2-500M-Video-Instruct,500M,rtx_5090_wsl,strict_json_fewshot,/mnt/d/AI/edge-llm-bench/results/figures/camera_v05_sample.jpg,general_description,96,448x252,7364.79,382.43,230.26,1347.35,A chair is visible in a room.,,False,False,False,,,,failed,False,output did not match requested protocol,parse_failed
+SmolVLM2-500M-Video-Instruct,HuggingFaceTB/SmolVLM2-500M-Video-Instruct,500M,rtx_5090_wsl,yes_no_token,/mnt/d/AI/edge-llm-bench/results/figures/camera_v05_sample.jpg,general_description,96,448x252,7364.79,263.09,110.03,1347.35,yes,,False,False,True,yes,,,yes_no,False,,success
+SmolVLM2-500M-Video-Instruct,HuggingFaceTB/SmolVLM2-500M-Video-Instruct,500M,rtx_5090_wsl,final_line,/mnt/d/AI/edge-llm-bench/results/figures/camera_v05_sample.jpg,general_description,96,448x252,7364.79,285.94,118.08,1347.35,yes,,False,False,True,yes,,,yes_no,False,,success
+SmolVLM2-500M-Video-Instruct,HuggingFaceTB/SmolVLM2-500M-Video-Instruct,500M,rtx_5090_wsl,retry_strict,/mnt/d/AI/edge-llm-bench/results/figures/camera_v05_sample.jpg,general_description,96,448x252,7364.79,1181.4,543.69,1347.35,A person is working on a computer with a white game controller.,"{
+  ""answer"": ""playing"",
+  ""confidence"": 100,
+  ""reason"": ""playing""
+}",True,True,False,playing,,,retry,True,,success
+SmolVLM2-256M-Video-Instruct,HuggingFaceTB/SmolVLM2-256M-Video-Instruct,256M,rtx_5090_wsl,strict_json,/mnt/d/AI/edge-llm-bench/results/figures/camera_v05_positive_detection.jpg,lipstick_presence,96,448x252,5470.23,311.85,153.83,855.57,The answer is no,,False,False,True,no,no,True,yes_no,False,,success
+SmolVLM2-256M-Video-Instruct,HuggingFaceTB/SmolVLM2-256M-Video-Instruct,256M,rtx_5090_wsl,strict_json_fewshot,/mnt/d/AI/edge-llm-bench/results/figures/camera_v05_positive_detection.jpg,lipstick_presence,96,448x252,5470.23,516.57,364.71,855.57,"{""answer"":""yes"",""confidence"":0.82,""reason"":""lipstick visible""}",,True,True,True,yes,no,False,strict_json,False,,success
+SmolVLM2-256M-Video-Instruct,HuggingFaceTB/SmolVLM2-256M-Video-Instruct,256M,rtx_5090_wsl,yes_no_token,/mnt/d/AI/edge-llm-bench/results/figures/camera_v05_positive_detection.jpg,lipstick_presence,96,448x252,5470.23,290.74,132.57,855.13,Answer: no,,False,False,True,no,no,True,yes_no,False,,success
+SmolVLM2-256M-Video-Instruct,HuggingFaceTB/SmolVLM2-256M-Video-Instruct,256M,rtx_5090_wsl,final_line,/mnt/d/AI/edge-llm-bench/results/figures/camera_v05_positive_detection.jpg,lipstick_presence,96,448x252,5470.23,305.61,149.45,855.57,Answer: no,,False,False,True,no,no,True,yes_no,False,,success
+SmolVLM2-256M-Video-Instruct,HuggingFaceTB/SmolVLM2-256M-Video-Instruct,256M,rtx_5090_wsl,retry_strict,/mnt/d/AI/edge-llm-bench/results/figures/camera_v05_positive_detection.jpg,lipstick_presence,96,448x252,5470.23,1337.86,162.44,855.57,The answer is no,"{
+  ""answer"": ""The chair is white and has a simple design."",
+  ""confidence"": ""The chair is white and has a simple design."",
+  ""reason"": ""The chair is white and has a simple design."",
+}",False,False,True,no,no,True,yes_no,True,,success
+SmolVLM2-256M-Video-Instruct,HuggingFaceTB/SmolVLM2-256M-Video-Instruct,256M,rtx_5090_wsl,strict_json,/mnt/d/AI/edge-llm-bench/results/figures/camera_v05_positive_detection.jpg,person_fall,96,448x252,5470.23,429.98,272.0,855.57,The image shows a person falling or lying on the ground.,,False,False,False,,no,False,failed,False,output did not match requested protocol,parse_failed
+SmolVLM2-256M-Video-Instruct,HuggingFaceTB/SmolVLM2-256M-Video-Instruct,256M,rtx_5090_wsl,strict_json_fewshot,/mnt/d/AI/edge-llm-bench/results/figures/camera_v05_positive_detection.jpg,person_fall,96,448x252,5470.23,546.14,388.16,855.57,"{""answer"":""no"",""confidence"":0.74,""reason"":""no person is visible""}",,True,True,True,no,no,True,strict_json,False,,success
+SmolVLM2-256M-Video-Instruct,HuggingFaceTB/SmolVLM2-256M-Video-Instruct,256M,rtx_5090_wsl,yes_no_token,/mnt/d/AI/edge-llm-bench/results/figures/camera_v05_positive_detection.jpg,person_fall,96,448x252,5470.23,320.4,146.1,855.13,The answer is lying,,False,False,False,,no,False,failed,False,output did not match requested protocol,parse_failed
+SmolVLM2-256M-Video-Instruct,HuggingFaceTB/SmolVLM2-256M-Video-Instruct,256M,rtx_5090_wsl,final_line,/mnt/d/AI/edge-llm-bench/results/figures/camera_v05_positive_detection.jpg,person_fall,96,448x252,5470.23,270.62,103.99,855.57,no,,False,False,True,no,no,True,yes_no,False,,success
+SmolVLM2-256M-Video-Instruct,HuggingFaceTB/SmolVLM2-256M-Video-Instruct,256M,rtx_5090_wsl,retry_strict,/mnt/d/AI/edge-llm-bench/results/figures/camera_v05_positive_detection.jpg,person_fall,96,448x252,5470.23,2213.26,266.96,855.57,The image shows a person falling or lying on the ground.,"{
+  ""title"": ""The person fell or fell on the ground"",
+  ""description"": ""The person fell or fell on the ground."",
+  ""user"": ""The person fell or fell on the ground."",
+  ""date"": ""2023-01-01"",
+  ""location"": ""The person fell or fell on the ground."",
+  ""timestamp"": ""2023-01-01"",
+  ""remarks"": ""The",False,False,False,,no,False,failed,True,output did not match requested protocol,parse_failed
+SmolVLM2-256M-Video-Instruct,HuggingFaceTB/SmolVLM2-256M-Video-Instruct,256M,rtx_5090_wsl,strict_json,/mnt/d/AI/edge-llm-bench/results/figures/camera_v05_positive_detection.jpg,abnormal_scene,96,448x252,5470.23,320.67,142.98,855.57,The answer is no,,False,False,True,no,,,yes_no,False,,success
+SmolVLM2-256M-Video-Instruct,HuggingFaceTB/SmolVLM2-256M-Video-Instruct,256M,rtx_5090_wsl,strict_json_fewshot,/mnt/d/AI/edge-llm-bench/results/figures/camera_v05_positive_detection.jpg,abnormal_scene,96,448x252,5470.23,319.74,162.77,855.57,"{""answer"":""yes""}",,True,True,True,yes,,,strict_json,False,,success
+SmolVLM2-256M-Video-Instruct,HuggingFaceTB/SmolVLM2-256M-Video-Instruct,256M,rtx_5090_wsl,yes_no_token,/mnt/d/AI/edge-llm-bench/results/figures/camera_v05_positive_detection.jpg,abnormal_scene,96,448x252,5470.23,259.1,104.46,855.13,No,,False,False,True,no,,,yes_no,False,,success
+SmolVLM2-256M-Video-Instruct,HuggingFaceTB/SmolVLM2-256M-Video-Instruct,256M,rtx_5090_wsl,final_line,/mnt/d/AI/edge-llm-bench/results/figures/camera_v05_positive_detection.jpg,abnormal_scene,96,448x252,5470.23,272.61,98.81,855.57,no,,False,False,True,no,,,yes_no,False,,success
+SmolVLM2-256M-Video-Instruct,HuggingFaceTB/SmolVLM2-256M-Video-Instruct,256M,rtx_5090_wsl,retry_strict,/mnt/d/AI/edge-llm-bench/results/figures/camera_v05_positive_detection.jpg,abnormal_scene,96,448x252,5470.23,1297.58,155.36,855.57,The answer is no,"{
+  ""answer"": ""The chair is white and has a simple design."",
+  ""confidence"": ""The chair is white and has a simple design."",
+  ""reason"": ""The chair is white and has a simple design."",
+}",False,False,True,no,,,yes_no,True,,success
+SmolVLM2-256M-Video-Instruct,HuggingFaceTB/SmolVLM2-256M-Video-Instruct,256M,rtx_5090_wsl,strict_json,/mnt/d/AI/edge-llm-bench/results/figures/camera_v05_positive_detection.jpg,general_description,96,448x252,5470.23,345.1,189.63,855.13,The monitor is showing a monitor screen,,False,False,False,,,,failed,False,output did not match requested protocol,parse_failed
+SmolVLM2-256M-Video-Instruct,HuggingFaceTB/SmolVLM2-256M-Video-Instruct,256M,rtx_5090_wsl,strict_json_fewshot,/mnt/d/AI/edge-llm-bench/results/figures/camera_v05_positive_detection.jpg,general_description,96,448x252,5470.23,636.65,472.19,855.57,"{""summary"":""A chair is visible in a room."",""objects"":[""chair""],""attention_needed"":false}",,True,True,False,a chair is visible in a room.,,,strict_json,False,,success
+SmolVLM2-256M-Video-Instruct,HuggingFaceTB/SmolVLM2-256M-Video-Instruct,256M,rtx_5090_wsl,yes_no_token,/mnt/d/AI/edge-llm-bench/results/figures/camera_v05_positive_detection.jpg,general_description,96,448x252,5470.23,303.61,146.98,855.12,does not need attention,,False,False,False,,,,failed,False,output did not match requested protocol,parse_failed
+SmolVLM2-256M-Video-Instruct,HuggingFaceTB/SmolVLM2-256M-Video-Instruct,256M,rtx_5090_wsl,final_line,/mnt/d/AI/edge-llm-bench/results/figures/camera_v05_positive_detection.jpg,general_description,96,448x252,5470.23,261.21,104.97,855.57,no,,False,False,True,no,,,yes_no,False,,success
+SmolVLM2-256M-Video-Instruct,HuggingFaceTB/SmolVLM2-256M-Video-Instruct,256M,rtx_5090_wsl,retry_strict,/mnt/d/AI/edge-llm-bench/results/figures/camera_v05_positive_detection.jpg,general_description,96,448x252,5470.23,1342.45,831.08,855.57,The monitor is showing a monitor screen,"{
+  ""answer"": {
+    ""key"": ""reason"",
+    ""confidence"": ""1"",
+    ""answer_type"": ""json"",
+    ""answer_desc"": ""The monitor screen shows a monitor screen""
+  }
+}",True,True,False,"{'key': 'reason', 'confidence': '1', 'answer_type': 'json', 'answer_desc': 'the monitor screen shows a monitor screen'}",,,retry,True,,success
+SmolVLM2-256M-Video-Instruct,HuggingFaceTB/SmolVLM2-256M-Video-Instruct,256M,rtx_5090_wsl,strict_json,/mnt/d/AI/edge-llm-bench/results/figures/camera_v05_real_vlm_sample.jpg,lipstick_presence,96,448x252,5470.23,319.08,148.65,855.57,The answer is no,,False,False,True,no,no,True,yes_no,False,,success
+SmolVLM2-256M-Video-Instruct,HuggingFaceTB/SmolVLM2-256M-Video-Instruct,256M,rtx_5090_wsl,strict_json_fewshot,/mnt/d/AI/edge-llm-bench/results/figures/camera_v05_real_vlm_sample.jpg,lipstick_presence,96,448x252,5470.23,512.65,356.56,855.57,"{""answer"":""yes"",""confidence"":0.82,""reason"":""lipstick visible""}",,True,True,True,yes,no,False,strict_json,False,,success
+SmolVLM2-256M-Video-Instruct,HuggingFaceTB/SmolVLM2-256M-Video-Instruct,256M,rtx_5090_wsl,yes_no_token,/mnt/d/AI/edge-llm-bench/results/figures/camera_v05_real_vlm_sample.jpg,lipstick_presence,96,448x252,5470.23,279.99,126.82,855.13,Answer: no,,False,False,True,no,no,True,yes_no,False,,success
+SmolVLM2-256M-Video-Instruct,HuggingFaceTB/SmolVLM2-256M-Video-Instruct,256M,rtx_5090_wsl,final_line,/mnt/d/AI/edge-llm-bench/results/figures/camera_v05_real_vlm_sample.jpg,lipstick_presence,96,448x252,5470.23,282.22,130.02,855.57,Answer: no,,False,False,True,no,no,True,yes_no,False,,success
+SmolVLM2-256M-Video-Instruct,HuggingFaceTB/SmolVLM2-256M-Video-Instruct,256M,rtx_5090_wsl,retry_strict,/mnt/d/AI/edge-llm-bench/results/figures/camera_v05_real_vlm_sample.jpg,lipstick_presence,96,448x252,5470.23,2047.51,156.14,855.57,The answer is no,"{
+  ""answer"": ""The bowl is white and is placed on the floor in the room. The room has a bed and a chair in it. The room has a window in it. The room has a door in it. The room has a bed in it. The room has a chair in it. The room has a window in it. The room has a door in it. The room has a bed in it. The room has a chair in it. The",False,False,True,no,no,True,yes_no,True,,success
+SmolVLM2-256M-Video-Instruct,HuggingFaceTB/SmolVLM2-256M-Video-Instruct,256M,rtx_5090_wsl,strict_json,/mnt/d/AI/edge-llm-bench/results/figures/camera_v05_real_vlm_sample.jpg,person_fall,96,448x252,5470.23,445.32,280.78,855.57,The image shows a person falling or lying on the ground.,,False,False,False,,no,False,failed,False,output did not match requested protocol,parse_failed
+SmolVLM2-256M-Video-Instruct,HuggingFaceTB/SmolVLM2-256M-Video-Instruct,256M,rtx_5090_wsl,strict_json_fewshot,/mnt/d/AI/edge-llm-bench/results/figures/camera_v05_real_vlm_sample.jpg,person_fall,96,448x252,5470.23,1782.66,1610.27,855.57,"The image shows a person falling.
+
+{
+    ""type"":""json"",
+    ""data"":[
+        {
+            ""type"":""json"",
+            ""data"":[
+                {
+                    ""type"":""json"",
+                    ""data"":[
+                        {
+                            ""type"":""json"",
+                            ""data"":[
+                                {
+                                    ""type"":""json"",
+                                    ""data"":[
+                                        {
+                                            ""type"":""json"",
+                                            ""data"":[
+                                                {
+                                                    ""type"":""json"",
+                                                    """,,False,False,False,,no,False,failed,False,output did not match requested protocol,parse_failed
+SmolVLM2-256M-Video-Instruct,HuggingFaceTB/SmolVLM2-256M-Video-Instruct,256M,rtx_5090_wsl,yes_no_token,/mnt/d/AI/edge-llm-bench/results/figures/camera_v05_real_vlm_sample.jpg,person_fall,96,448x252,5470.23,320.62,151.15,855.13,The answer is falling,,False,False,False,,no,False,failed,False,output did not match requested protocol,parse_failed
+SmolVLM2-256M-Video-Instruct,HuggingFaceTB/SmolVLM2-256M-Video-Instruct,256M,rtx_5090_wsl,final_line,/mnt/d/AI/edge-llm-bench/results/figures/camera_v05_real_vlm_sample.jpg,person_fall,96,448x252,5470.23,259.25,105.95,855.57,no,,False,False,True,no,no,True,yes_no,False,,success
+SmolVLM2-256M-Video-Instruct,HuggingFaceTB/SmolVLM2-256M-Video-Instruct,256M,rtx_5090_wsl,retry_strict,/mnt/d/AI/edge-llm-bench/results/figures/camera_v05_real_vlm_sample.jpg,person_fall,96,448x252,5470.23,2153.24,274.8,855.57,The image shows a person falling or lying on the ground.,"{
+  ""title"": ""The person fell or fell on the ground"",
+  ""description"": ""The person fell or fell on the ground."",
+  ""user"": ""The person fell or fell on the ground."",
+  ""date"": ""2023-01-01"",
+  ""location"": ""The person fell or fell on the ground."",
+  ""timestamp"": ""2023-01-01T00:00:0",False,False,False,,no,False,failed,True,output did not match requested protocol,parse_failed
+SmolVLM2-256M-Video-Instruct,HuggingFaceTB/SmolVLM2-256M-Video-Instruct,256M,rtx_5090_wsl,strict_json,/mnt/d/AI/edge-llm-bench/results/figures/camera_v05_real_vlm_sample.jpg,abnormal_scene,96,448x252,5470.23,319.19,151.94,855.57,The answer is no,,False,False,True,no,,,yes_no,False,,success
+SmolVLM2-256M-Video-Instruct,HuggingFaceTB/SmolVLM2-256M-Video-Instruct,256M,rtx_5090_wsl,strict_json_fewshot,/mnt/d/AI/edge-llm-bench/results/figures/camera_v05_real_vlm_sample.jpg,abnormal_scene,96,448x252,5470.23,516.45,352.9,855.57,"{""answer"":""no"",""confidence"":0.45,""reason"":""no""}",,True,True,True,no,,,strict_json,False,,success
+SmolVLM2-256M-Video-Instruct,HuggingFaceTB/SmolVLM2-256M-Video-Instruct,256M,rtx_5090_wsl,yes_no_token,/mnt/d/AI/edge-llm-bench/results/figures/camera_v05_real_vlm_sample.jpg,abnormal_scene,96,448x252,5470.23,256.01,101.77,855.13,No,,False,False,True,no,,,yes_no,False,,success
+SmolVLM2-256M-Video-Instruct,HuggingFaceTB/SmolVLM2-256M-Video-Instruct,256M,rtx_5090_wsl,final_line,/mnt/d/AI/edge-llm-bench/results/figures/camera_v05_real_vlm_sample.jpg,abnormal_scene,96,448x252,5470.23,269.52,109.11,855.57,no,,False,False,True,no,,,yes_no,False,,success
+SmolVLM2-256M-Video-Instruct,HuggingFaceTB/SmolVLM2-256M-Video-Instruct,256M,rtx_5090_wsl,retry_strict,/mnt/d/AI/edge-llm-bench/results/figures/camera_v05_real_vlm_sample.jpg,abnormal_scene,96,448x252,5470.23,2074.68,148.72,855.57,The answer is no,"{
+  ""answer"": ""The bowl is white and is placed on the floor in the room. The room has a bed and a chair in it. The room has a window in it. The room has a door in it. The room has a bed in it. The room has a chair in it. The room has a window in it. The room has a door in it. The room has a bed in it. The room has a chair in it. The",False,False,True,no,,,yes_no,True,,success
+SmolVLM2-256M-Video-Instruct,HuggingFaceTB/SmolVLM2-256M-Video-Instruct,256M,rtx_5090_wsl,strict_json,/mnt/d/AI/edge-llm-bench/results/figures/camera_v05_real_vlm_sample.jpg,general_description,96,448x252,5470.23,364.61,194.26,855.13,The monitor is showing a monitor.,,False,False,False,,,,failed,False,output did not match requested protocol,parse_failed
+SmolVLM2-256M-Video-Instruct,HuggingFaceTB/SmolVLM2-256M-Video-Instruct,256M,rtx_5090_wsl,strict_json_fewshot,/mnt/d/AI/edge-llm-bench/results/figures/camera_v05_real_vlm_sample.jpg,general_description,96,448x252,5470.23,613.85,455.68,855.57,"{""summary"":""A chair is visible in a room."",""objects"":[""chair""],""attention_needed"":false}",,True,True,False,a chair is visible in a room.,,,strict_json,False,,success
+SmolVLM2-256M-Video-Instruct,HuggingFaceTB/SmolVLM2-256M-Video-Instruct,256M,rtx_5090_wsl,yes_no_token,/mnt/d/AI/edge-llm-bench/results/figures/camera_v05_real_vlm_sample.jpg,general_description,96,448x252,5470.23,304.78,148.49,855.12,does not need attention,,False,False,False,,,,failed,False,output did not match requested protocol,parse_failed
+SmolVLM2-256M-Video-Instruct,HuggingFaceTB/SmolVLM2-256M-Video-Instruct,256M,rtx_5090_wsl,final_line,/mnt/d/AI/edge-llm-bench/results/figures/camera_v05_real_vlm_sample.jpg,general_description,96,448x252,5470.23,256.51,97.9,855.57,no,,False,False,True,no,,,yes_no,False,,success
+SmolVLM2-256M-Video-Instruct,HuggingFaceTB/SmolVLM2-256M-Video-Instruct,256M,rtx_5090_wsl,retry_strict,/mnt/d/AI/edge-llm-bench/results/figures/camera_v05_real_vlm_sample.jpg,general_description,96,448x252,5470.23,1113.75,583.77,855.57,The monitor is showing a monitor.,"{
+  ""answer"": {
+    ""key"": ""monitor"",
+    ""confidence"": ""1"",
+    ""reason"": ""1""
+  }
+}",True,True,False,"{'key': 'monitor', 'confidence': '1', 'reason': '1'}",,,retry,True,,success
+SmolVLM2-256M-Video-Instruct,HuggingFaceTB/SmolVLM2-256M-Video-Instruct,256M,rtx_5090_wsl,strict_json,/mnt/d/AI/edge-llm-bench/results/figures/camera_v05_sample.jpg,lipstick_presence,96,448x252,5470.23,324.67,166.7,855.57,The answer is no,,False,False,True,no,no,True,yes_no,False,,success
+SmolVLM2-256M-Video-Instruct,HuggingFaceTB/SmolVLM2-256M-Video-Instruct,256M,rtx_5090_wsl,strict_json_fewshot,/mnt/d/AI/edge-llm-bench/results/figures/camera_v05_sample.jpg,lipstick_presence,96,448x252,5470.23,324.77,164.63,855.57,The answer is No.,,False,False,True,no,no,True,yes_no,False,,success
+SmolVLM2-256M-Video-Instruct,HuggingFaceTB/SmolVLM2-256M-Video-Instruct,256M,rtx_5090_wsl,yes_no_token,/mnt/d/AI/edge-llm-bench/results/figures/camera_v05_sample.jpg,lipstick_presence,96,448x252,5470.23,296.53,136.92,855.13,Answer: no,,False,False,True,no,no,True,yes_no,False,,success
+SmolVLM2-256M-Video-Instruct,HuggingFaceTB/SmolVLM2-256M-Video-Instruct,256M,rtx_5090_wsl,final_line,/mnt/d/AI/edge-llm-bench/results/figures/camera_v05_sample.jpg,lipstick_presence,96,448x252,5470.23,295.09,140.12,855.57,Answer: no,,False,False,True,no,no,True,yes_no,False,,success
+SmolVLM2-256M-Video-Instruct,HuggingFaceTB/SmolVLM2-256M-Video-Instruct,256M,rtx_5090_wsl,retry_strict,/mnt/d/AI/edge-llm-bench/results/figures/camera_v05_sample.jpg,lipstick_presence,96,448x252,5470.23,2058.52,154.06,855.57,The answer is no,"return {
+  'key': 'key1',
+  'value': 'value1',
+  'reason': 'reason1',
+  'key2': 'key2',
+  'value2': 'value2',
+  'reason2': 'reason2',
+  'key3': 'key3',
+  'value3': 'value3',
+  'reason3': 'reason3',
+  'key4': 'key4',
+  'value4': 'value",False,False,True,no,no,True,yes_no,True,,success
+SmolVLM2-256M-Video-Instruct,HuggingFaceTB/SmolVLM2-256M-Video-Instruct,256M,rtx_5090_wsl,strict_json,/mnt/d/AI/edge-llm-bench/results/figures/camera_v05_sample.jpg,person_fall,96,448x252,5470.23,439.14,268.91,855.57,The image shows a person falling or lying on the ground.,,False,False,False,,no,False,failed,False,output did not match requested protocol,parse_failed
+SmolVLM2-256M-Video-Instruct,HuggingFaceTB/SmolVLM2-256M-Video-Instruct,256M,rtx_5090_wsl,strict_json_fewshot,/mnt/d/AI/edge-llm-bench/results/figures/camera_v05_sample.jpg,person_fall,96,448x252,5470.23,429.71,275.08,855.57,The image shows a person falling or lying on the ground.,,False,False,False,,no,False,failed,False,output did not match requested protocol,parse_failed
+SmolVLM2-256M-Video-Instruct,HuggingFaceTB/SmolVLM2-256M-Video-Instruct,256M,rtx_5090_wsl,yes_no_token,/mnt/d/AI/edge-llm-bench/results/figures/camera_v05_sample.jpg,person_fall,96,448x252,5470.23,305.87,151.25,855.13,The answer is falling,,False,False,False,,no,False,failed,False,output did not match requested protocol,parse_failed
+SmolVLM2-256M-Video-Instruct,HuggingFaceTB/SmolVLM2-256M-Video-Instruct,256M,rtx_5090_wsl,final_line,/mnt/d/AI/edge-llm-bench/results/figures/camera_v05_sample.jpg,person_fall,96,448x252,5470.23,273.63,113.98,855.57,no,,False,False,True,no,no,True,yes_no,False,,success
+SmolVLM2-256M-Video-Instruct,HuggingFaceTB/SmolVLM2-256M-Video-Instruct,256M,rtx_5090_wsl,retry_strict,/mnt/d/AI/edge-llm-bench/results/figures/camera_v05_sample.jpg,person_fall,96,448x252,5470.23,2271.38,290.48,855.57,The image shows a person falling or lying on the ground.,"{
+  ""title"": ""The man fell"",
+  ""description"": ""A man fell while playing a video game."",
+  ""images"": [
+    {
+      ""id"": ""image1"",
+      ""url"": ""https://example.com/image1.jpg"",
+      ""width"": ""100%"",
+      ""height"": ""100%"",
+      ""caption"": ""The man fell while playing a video game."",
+      ""description"": ""The man",False,False,False,,no,False,failed,True,output did not match requested protocol,parse_failed
+SmolVLM2-256M-Video-Instruct,HuggingFaceTB/SmolVLM2-256M-Video-Instruct,256M,rtx_5090_wsl,strict_json,/mnt/d/AI/edge-llm-bench/results/figures/camera_v05_sample.jpg,abnormal_scene,96,448x252,5470.23,298.84,140.97,855.57,Answer: no,,False,False,True,no,,,yes_no,False,,success
+SmolVLM2-256M-Video-Instruct,HuggingFaceTB/SmolVLM2-256M-Video-Instruct,256M,rtx_5090_wsl,strict_json_fewshot,/mnt/d/AI/edge-llm-bench/results/figures/camera_v05_sample.jpg,abnormal_scene,96,448x252,5470.23,476.01,304.73,855.57,"{""answer"":""no"",""confidence"":0.45,""reason"":""no""}",,True,True,True,no,,,strict_json,False,,success
+SmolVLM2-256M-Video-Instruct,HuggingFaceTB/SmolVLM2-256M-Video-Instruct,256M,rtx_5090_wsl,yes_no_token,/mnt/d/AI/edge-llm-bench/results/figures/camera_v05_sample.jpg,abnormal_scene,96,448x252,5470.23,261.08,102.32,855.13,no,,False,False,True,no,,,yes_no,False,,success
+SmolVLM2-256M-Video-Instruct,HuggingFaceTB/SmolVLM2-256M-Video-Instruct,256M,rtx_5090_wsl,final_line,/mnt/d/AI/edge-llm-bench/results/figures/camera_v05_sample.jpg,abnormal_scene,96,448x252,5470.23,264.7,104.03,855.57,no,,False,False,True,no,,,yes_no,False,,success
+SmolVLM2-256M-Video-Instruct,HuggingFaceTB/SmolVLM2-256M-Video-Instruct,256M,rtx_5090_wsl,retry_strict,/mnt/d/AI/edge-llm-bench/results/figures/camera_v05_sample.jpg,abnormal_scene,96,448x252,5470.23,1989.02,134.46,855.57,Answer: no,"{
+  ""answer"": {
+    ""key"": ""reason"",
+    ""value"": ""confidence"",
+    ""description"": ""The reason for the reason is that the reason is that the reason is that the reason is that the reason is that the reason is that the reason is that the reason is that the reason is that the reason is that the reason is that the reason is that the reason is that the reason is that the reason is that the reason is that the reason is that",False,False,True,no,,,yes_no,True,,success
+SmolVLM2-256M-Video-Instruct,HuggingFaceTB/SmolVLM2-256M-Video-Instruct,256M,rtx_5090_wsl,strict_json,/mnt/d/AI/edge-llm-bench/results/figures/camera_v05_sample.jpg,general_description,96,448x252,5470.23,408.8,233.44,855.13,The monitoring frame is of a person in a room,,False,False,False,,,,failed,False,output did not match requested protocol,parse_failed
+SmolVLM2-256M-Video-Instruct,HuggingFaceTB/SmolVLM2-256M-Video-Instruct,256M,rtx_5090_wsl,strict_json_fewshot,/mnt/d/AI/edge-llm-bench/results/figures/camera_v05_sample.jpg,general_description,96,448x252,5470.23,664.65,496.47,855.57,"{""summary"":""A chair is visible in a room."",""objects"":[""chair""],""attention_needed"":false}",,True,True,False,a chair is visible in a room.,,,strict_json,False,,success
+SmolVLM2-256M-Video-Instruct,HuggingFaceTB/SmolVLM2-256M-Video-Instruct,256M,rtx_5090_wsl,yes_no_token,/mnt/d/AI/edge-llm-bench/results/figures/camera_v05_sample.jpg,general_description,96,448x252,5470.23,343.21,153.39,855.12,does not need attention,,False,False,False,,,,failed,False,output did not match requested protocol,parse_failed
+SmolVLM2-256M-Video-Instruct,HuggingFaceTB/SmolVLM2-256M-Video-Instruct,256M,rtx_5090_wsl,final_line,/mnt/d/AI/edge-llm-bench/results/figures/camera_v05_sample.jpg,general_description,96,448x252,5470.23,272.93,111.68,855.57,no,,False,False,True,no,,,yes_no,False,,success
+SmolVLM2-256M-Video-Instruct,HuggingFaceTB/SmolVLM2-256M-Video-Instruct,256M,rtx_5090_wsl,retry_strict,/mnt/d/AI/edge-llm-bench/results/figures/camera_v05_sample.jpg,general_description,96,448x252,5470.23,1255.58,665.54,855.57,The monitoring frame is of a person in a room,"{
+  ""answer"": {
+    ""confidence"": 1,
+    ""reason"": ""The person is in a room with a monitor and a keyboard""
+  }
+}",True,True,False,"{'confidence': 1, 'reason': 'the person is in a room with a monitor and a keyboard'}",,,retry,True,,success
+SmolVLM2-2.2B-Instruct,HuggingFaceTB/SmolVLM2-2.2B-Instruct,2.2B,rtx_5090_wsl,strict_json,/mnt/d/AI/edge-llm-bench/results/figures/camera_v05_positive_detection.jpg,lipstick_presence,96,448x252,11421.11,469.62,370.77,4630.43,Answer: no,,False,False,True,no,no,True,yes_no,False,,success
+SmolVLM2-2.2B-Instruct,HuggingFaceTB/SmolVLM2-2.2B-Instruct,2.2B,rtx_5090_wsl,strict_json_fewshot,/mnt/d/AI/edge-llm-bench/results/figures/camera_v05_positive_detection.jpg,lipstick_presence,96,448x252,11421.11,702.24,607.45,4635.69,"{""answer"":""no"",""confidence"":0.99,""reason"":""no lipstick""}",,True,True,True,no,no,True,strict_json,False,,success
+SmolVLM2-2.2B-Instruct,HuggingFaceTB/SmolVLM2-2.2B-Instruct,2.2B,rtx_5090_wsl,yes_no_token,/mnt/d/AI/edge-llm-bench/results/figures/camera_v05_positive_detection.jpg,lipstick_presence,96,448x252,11421.11,481.55,382.27,4628.9,UNKNOWN,,False,False,True,unknown,no,False,yes_no,False,,success
+SmolVLM2-2.2B-Instruct,HuggingFaceTB/SmolVLM2-2.2B-Instruct,2.2B,rtx_5090_wsl,final_line,/mnt/d/AI/edge-llm-bench/results/figures/camera_v05_positive_detection.jpg,lipstick_presence,96,448x252,11421.11,545.43,439.94,4631.18,FINAL_ANSWER: NO,,False,False,True,no,no,True,final_line,False,,success
+SmolVLM2-2.2B-Instruct,HuggingFaceTB/SmolVLM2-2.2B-Instruct,2.2B,rtx_5090_wsl,retry_strict,/mnt/d/AI/edge-llm-bench/results/figures/camera_v05_positive_detection.jpg,lipstick_presence,96,448x252,11421.11,1164.26,580.05,4629.43,Answer: no,"{ ""answer"": ""no"", ""confidence"": 1, ""reason"": """" }",True,True,True,no,no,True,retry,True,,success
+SmolVLM2-2.2B-Instruct,HuggingFaceTB/SmolVLM2-2.2B-Instruct,2.2B,rtx_5090_wsl,strict_json,/mnt/d/AI/edge-llm-bench/results/figures/camera_v05_positive_detection.jpg,person_fall,96,448x252,11421.11,462.28,365.02,4633.43,No,,False,False,True,no,no,True,yes_no,False,,success
+SmolVLM2-2.2B-Instruct,HuggingFaceTB/SmolVLM2-2.2B-Instruct,2.2B,rtx_5090_wsl,strict_json_fewshot,/mnt/d/AI/edge-llm-bench/results/figures/camera_v05_positive_detection.jpg,person_fall,96,448x252,11421.11,436.48,337.16,4638.96,no,,False,False,True,no,no,True,yes_no,False,,success
+SmolVLM2-2.2B-Instruct,HuggingFaceTB/SmolVLM2-2.2B-Instruct,2.2B,rtx_5090_wsl,yes_no_token,/mnt/d/AI/edge-llm-bench/results/figures/camera_v05_positive_detection.jpg,person_fall,96,448x252,11421.11,476.46,375.62,4629.68,UNKNOWN,,False,False,True,unknown,no,False,yes_no,False,,success
+SmolVLM2-2.2B-Instruct,HuggingFaceTB/SmolVLM2-2.2B-Instruct,2.2B,rtx_5090_wsl,final_line,/mnt/d/AI/edge-llm-bench/results/figures/camera_v05_positive_detection.jpg,person_fall,96,448x252,11421.11,545.89,448.93,4632.18,FINAL_ANSWER: NO,,False,False,True,no,no,True,final_line,False,,success
+SmolVLM2-2.2B-Instruct,HuggingFaceTB/SmolVLM2-2.2B-Instruct,2.2B,rtx_5090_wsl,retry_strict,/mnt/d/AI/edge-llm-bench/results/figures/camera_v05_positive_detection.jpg,person_fall,96,448x252,11421.11,1490.97,886.22,4628.99,No,"{ ""answer"": ""The chair is white and has a backrest."", ""confidence"": 0.95, ""reason"": ""The chair is white and has a backrest."" }",True,True,False,the chair is white and has a backrest.,no,False,retry,True,,success
+SmolVLM2-2.2B-Instruct,HuggingFaceTB/SmolVLM2-2.2B-Instruct,2.2B,rtx_5090_wsl,strict_json,/mnt/d/AI/edge-llm-bench/results/figures/camera_v05_positive_detection.jpg,abnormal_scene,96,448x252,11421.11,460.57,359.01,4632.43,yes,,False,False,True,yes,,,yes_no,False,,success
+SmolVLM2-2.2B-Instruct,HuggingFaceTB/SmolVLM2-2.2B-Instruct,2.2B,rtx_5090_wsl,strict_json_fewshot,/mnt/d/AI/edge-llm-bench/results/figures/camera_v05_positive_detection.jpg,abnormal_scene,96,448x252,11421.11,466.88,367.61,4636.94,unknown,,False,False,True,unknown,,,yes_no,False,,success
+SmolVLM2-2.2B-Instruct,HuggingFaceTB/SmolVLM2-2.2B-Instruct,2.2B,rtx_5090_wsl,yes_no_token,/mnt/d/AI/edge-llm-bench/results/figures/camera_v05_positive_detection.jpg,abnormal_scene,96,448x252,11421.11,502.92,388.09,4629.18,UNKNOWN,,False,False,True,unknown,,,yes_no,False,,success
+SmolVLM2-2.2B-Instruct,HuggingFaceTB/SmolVLM2-2.2B-Instruct,2.2B,rtx_5090_wsl,final_line,/mnt/d/AI/edge-llm-bench/results/figures/camera_v05_positive_detection.jpg,abnormal_scene,96,448x252,11421.11,594.85,476.65,4631.68,FINAL_ANSWER: NO,,False,False,True,no,,,final_line,False,,success
+SmolVLM2-2.2B-Instruct,HuggingFaceTB/SmolVLM2-2.2B-Instruct,2.2B,rtx_5090_wsl,retry_strict,/mnt/d/AI/edge-llm-bench/results/figures/camera_v05_positive_detection.jpg,abnormal_scene,96,448x252,11421.11,1446.29,886.77,4628.99,yes,"{ ""answer"": ""The chair is white and has a backrest."", ""confidence"": 0.95, ""reason"": ""The chair is white and has a backrest."" }",True,True,False,the chair is white and has a backrest.,,,retry,True,,success
+SmolVLM2-2.2B-Instruct,HuggingFaceTB/SmolVLM2-2.2B-Instruct,2.2B,rtx_5090_wsl,strict_json,/mnt/d/AI/edge-llm-bench/results/figures/camera_v05_positive_detection.jpg,general_description,96,448x252,11421.11,656.0,553.54,4628.9,The monitoring frame is a white plastic chair with a black cushion.,,False,False,False,,,,failed,False,output did not match requested protocol,parse_failed
+SmolVLM2-2.2B-Instruct,HuggingFaceTB/SmolVLM2-2.2B-Instruct,2.2B,rtx_5090_wsl,strict_json_fewshot,/mnt/d/AI/edge-llm-bench/results/figures/camera_v05_positive_detection.jpg,general_description,96,448x252,11421.11,585.67,479.81,4638.77,A chair is visible in a room.,,False,False,False,,,,failed,False,output did not match requested protocol,parse_failed
+SmolVLM2-2.2B-Instruct,HuggingFaceTB/SmolVLM2-2.2B-Instruct,2.2B,rtx_5090_wsl,yes_no_token,/mnt/d/AI/edge-llm-bench/results/figures/camera_v05_positive_detection.jpg,general_description,96,448x252,11421.11,488.14,373.7,4628.71,UNKNOWN,,False,False,True,unknown,,,yes_no,False,,success
+SmolVLM2-2.2B-Instruct,HuggingFaceTB/SmolVLM2-2.2B-Instruct,2.2B,rtx_5090_wsl,final_line,/mnt/d/AI/edge-llm-bench/results/figures/camera_v05_positive_detection.jpg,general_description,96,448x252,11421.11,671.49,543.51,4630.68,FINAL_ANSWER: YES|NO|UNKNOWN,,False,False,True,yes,,,final_line,False,,success
+SmolVLM2-2.2B-Instruct,HuggingFaceTB/SmolVLM2-2.2B-Instruct,2.2B,rtx_5090_wsl,retry_strict,/mnt/d/AI/edge-llm-bench/results/figures/camera_v05_positive_detection.jpg,general_description,96,448x252,11421.11,1953.56,1188.51,4631.93,The monitoring frame is a white plastic chair with a black cushion.,"{
+    ""answer"": ""The monitoring frame is a white plastic chair with a black cushion."",
+    ""confidence"": 1,
+    ""reason"": ""The chair is white and has a black cushion, which is consistent with the description of the chair in the image.""
+}",True,True,False,the monitoring frame is a white plastic chair with a black cushion.,,,retry,True,,success
+SmolVLM2-2.2B-Instruct,HuggingFaceTB/SmolVLM2-2.2B-Instruct,2.2B,rtx_5090_wsl,strict_json,/mnt/d/AI/edge-llm-bench/results/figures/camera_v05_real_vlm_sample.jpg,lipstick_presence,96,448x252,11421.11,503.31,401.85,4630.43,Answer: no,,False,False,True,no,no,True,yes_no,False,,success
+SmolVLM2-2.2B-Instruct,HuggingFaceTB/SmolVLM2-2.2B-Instruct,2.2B,rtx_5090_wsl,strict_json_fewshot,/mnt/d/AI/edge-llm-bench/results/figures/camera_v05_real_vlm_sample.jpg,lipstick_presence,96,448x252,11421.11,751.57,633.79,4635.69,"{""answer"":""no"",""confidence"":0.99,""reason"":""no lipstick""}",,True,True,True,no,no,True,strict_json,False,,success
+SmolVLM2-2.2B-Instruct,HuggingFaceTB/SmolVLM2-2.2B-Instruct,2.2B,rtx_5090_wsl,yes_no_token,/mnt/d/AI/edge-llm-bench/results/figures/camera_v05_real_vlm_sample.jpg,lipstick_presence,96,448x252,11421.11,481.68,378.94,4628.9,no,,False,False,True,no,no,True,yes_no,False,,success
+SmolVLM2-2.2B-Instruct,HuggingFaceTB/SmolVLM2-2.2B-Instruct,2.2B,rtx_5090_wsl,final_line,/mnt/d/AI/edge-llm-bench/results/figures/camera_v05_real_vlm_sample.jpg,lipstick_presence,96,448x252,11421.11,594.46,486.47,4631.18,FINAL_ANSWER: NO,,False,False,True,no,no,True,final_line,False,,success
+SmolVLM2-2.2B-Instruct,HuggingFaceTB/SmolVLM2-2.2B-Instruct,2.2B,rtx_5090_wsl,retry_strict,/mnt/d/AI/edge-llm-bench/results/figures/camera_v05_real_vlm_sample.jpg,lipstick_presence,96,448x252,11421.11,1299.58,673.68,4629.43,Answer: no,"{ ""answer"": ""no"", ""confidence"": ""1.0"", ""reason"": """" }",True,True,True,no,no,True,retry,True,,success
+SmolVLM2-2.2B-Instruct,HuggingFaceTB/SmolVLM2-2.2B-Instruct,2.2B,rtx_5090_wsl,strict_json,/mnt/d/AI/edge-llm-bench/results/figures/camera_v05_real_vlm_sample.jpg,person_fall,96,448x252,11421.11,508.45,406.65,4633.43,No,,False,False,True,no,no,True,yes_no,False,,success
+SmolVLM2-2.2B-Instruct,HuggingFaceTB/SmolVLM2-2.2B-Instruct,2.2B,rtx_5090_wsl,strict_json_fewshot,/mnt/d/AI/edge-llm-bench/results/figures/camera_v05_real_vlm_sample.jpg,person_fall,96,448x252,11421.11,475.84,356.09,4638.96,no,,False,False,True,no,no,True,yes_no,False,,success
+SmolVLM2-2.2B-Instruct,HuggingFaceTB/SmolVLM2-2.2B-Instruct,2.2B,rtx_5090_wsl,yes_no_token,/mnt/d/AI/edge-llm-bench/results/figures/camera_v05_real_vlm_sample.jpg,person_fall,96,448x252,11421.11,467.8,344.16,4629.68,no,,False,False,True,no,no,True,yes_no,False,,success
+SmolVLM2-2.2B-Instruct,HuggingFaceTB/SmolVLM2-2.2B-Instruct,2.2B,rtx_5090_wsl,final_line,/mnt/d/AI/edge-llm-bench/results/figures/camera_v05_real_vlm_sample.jpg,person_fall,96,448x252,11421.11,566.36,449.43,4632.18,FINAL_ANSWER: NO,,False,False,True,no,no,True,final_line,False,,success
+SmolVLM2-2.2B-Instruct,HuggingFaceTB/SmolVLM2-2.2B-Instruct,2.2B,rtx_5090_wsl,retry_strict,/mnt/d/AI/edge-llm-bench/results/figures/camera_v05_real_vlm_sample.jpg,person_fall,96,448x252,11421.11,1260.32,699.69,4628.99,No,"{ ""answer"": ""white bowl"", ""confidence"": ""1"", ""reason"": ""The object is a white bowl"" }",True,True,False,white bowl,no,False,retry,True,,success
+SmolVLM2-2.2B-Instruct,HuggingFaceTB/SmolVLM2-2.2B-Instruct,2.2B,rtx_5090_wsl,strict_json,/mnt/d/AI/edge-llm-bench/results/figures/camera_v05_real_vlm_sample.jpg,abnormal_scene,96,448x252,11421.11,524.49,423.35,4632.43,Answer: yes,,False,False,True,yes,,,yes_no,False,,success
+SmolVLM2-2.2B-Instruct,HuggingFaceTB/SmolVLM2-2.2B-Instruct,2.2B,rtx_5090_wsl,strict_json_fewshot,/mnt/d/AI/edge-llm-bench/results/figures/camera_v05_real_vlm_sample.jpg,abnormal_scene,96,448x252,11421.11,453.64,330.06,4636.94,unknown,,False,False,True,unknown,,,yes_no,False,,success
+SmolVLM2-2.2B-Instruct,HuggingFaceTB/SmolVLM2-2.2B-Instruct,2.2B,rtx_5090_wsl,yes_no_token,/mnt/d/AI/edge-llm-bench/results/figures/camera_v05_real_vlm_sample.jpg,abnormal_scene,96,448x252,11421.11,528.75,422.27,4629.18,UNKNOWN,,False,False,True,unknown,,,yes_no,False,,success
+SmolVLM2-2.2B-Instruct,HuggingFaceTB/SmolVLM2-2.2B-Instruct,2.2B,rtx_5090_wsl,final_line,/mnt/d/AI/edge-llm-bench/results/figures/camera_v05_real_vlm_sample.jpg,abnormal_scene,96,448x252,11421.11,557.8,452.52,4631.68,FINAL_ANSWER: NO,,False,False,True,no,,,final_line,False,,success
+SmolVLM2-2.2B-Instruct,HuggingFaceTB/SmolVLM2-2.2B-Instruct,2.2B,rtx_5090_wsl,retry_strict,/mnt/d/AI/edge-llm-bench/results/figures/camera_v05_real_vlm_sample.jpg,abnormal_scene,96,448x252,11421.11,2329.33,1718.7,4629.43,Answer: yes,"{ ""answer"": ""yes"", ""confidence"": ""1.0"", ""reason"": ""The image contains a white bowl placed on a gray cushion, which is positioned on a white shelf. The shelf is situated in a room with a bed and a box in the background. The image is taken from a low angle, and the lighting is dim, creating a shadow on the wall behind the shelf. The bowl is the only object in the image that is clearly visible, and",False,False,True,yes,,,retry,True,,success
+SmolVLM2-2.2B-Instruct,HuggingFaceTB/SmolVLM2-2.2B-Instruct,2.2B,rtx_5090_wsl,strict_json,/mnt/d/AI/edge-llm-bench/results/figures/camera_v05_real_vlm_sample.jpg,general_description,96,448x252,11421.11,686.32,583.75,4628.9,The monitoring frame is a white table with a grey cushion on it.,,False,False,False,,,,failed,False,output did not match requested protocol,parse_failed
+SmolVLM2-2.2B-Instruct,HuggingFaceTB/SmolVLM2-2.2B-Instruct,2.2B,rtx_5090_wsl,strict_json_fewshot,/mnt/d/AI/edge-llm-bench/results/figures/camera_v05_real_vlm_sample.jpg,general_description,96,448x252,11421.11,610.57,509.65,4638.77,A chair is visible in a room.,,False,False,False,,,,failed,False,output did not match requested protocol,parse_failed
+SmolVLM2-2.2B-Instruct,HuggingFaceTB/SmolVLM2-2.2B-Instruct,2.2B,rtx_5090_wsl,yes_no_token,/mnt/d/AI/edge-llm-bench/results/figures/camera_v05_real_vlm_sample.jpg,general_description,96,448x252,11421.11,475.78,362.77,4628.71,UNKNOWN,,False,False,True,unknown,,,yes_no,False,,success
+SmolVLM2-2.2B-Instruct,HuggingFaceTB/SmolVLM2-2.2B-Instruct,2.2B,rtx_5090_wsl,final_line,/mnt/d/AI/edge-llm-bench/results/figures/camera_v05_real_vlm_sample.jpg,general_description,96,448x252,11421.11,566.45,434.07,4630.68,FINAL_ANSWER: YES,,False,False,True,yes,,,final_line,False,,success
+SmolVLM2-2.2B-Instruct,HuggingFaceTB/SmolVLM2-2.2B-Instruct,2.2B,rtx_5090_wsl,retry_strict,/mnt/d/AI/edge-llm-bench/results/figures/camera_v05_real_vlm_sample.jpg,general_description,96,448x252,11421.11,1582.35,843.82,4632.18,The monitoring frame is a white table with a grey cushion on it.,"{
+    ""answer"": ""The monitoring frame is a white table with a grey cushion on it."",
+    ""confidence"": 1,
+    ""reason"": """"
+}",True,True,False,the monitoring frame is a white table with a grey cushion on it.,,,retry,True,,success
+SmolVLM2-2.2B-Instruct,HuggingFaceTB/SmolVLM2-2.2B-Instruct,2.2B,rtx_5090_wsl,strict_json,/mnt/d/AI/edge-llm-bench/results/figures/camera_v05_sample.jpg,lipstick_presence,96,448x252,11421.11,479.84,384.42,4630.43,Answer: no,,False,False,True,no,no,True,yes_no,False,,success
+SmolVLM2-2.2B-Instruct,HuggingFaceTB/SmolVLM2-2.2B-Instruct,2.2B,rtx_5090_wsl,strict_json_fewshot,/mnt/d/AI/edge-llm-bench/results/figures/camera_v05_sample.jpg,lipstick_presence,96,448x252,11421.11,730.76,610.68,4635.69,"{""answer"":""no"",""confidence"":0.99,""reason"":""no lipstick visible""}",,True,True,True,no,no,True,strict_json,False,,success
+SmolVLM2-2.2B-Instruct,HuggingFaceTB/SmolVLM2-2.2B-Instruct,2.2B,rtx_5090_wsl,yes_no_token,/mnt/d/AI/edge-llm-bench/results/figures/camera_v05_sample.jpg,lipstick_presence,96,448x252,11421.11,476.44,381.32,4628.9,no,,False,False,True,no,no,True,yes_no,False,,success
+SmolVLM2-2.2B-Instruct,HuggingFaceTB/SmolVLM2-2.2B-Instruct,2.2B,rtx_5090_wsl,final_line,/mnt/d/AI/edge-llm-bench/results/figures/camera_v05_sample.jpg,lipstick_presence,96,448x252,11421.11,524.4,417.75,4631.18,FINAL_ANSWER: NO,,False,False,True,no,no,True,final_line,False,,success
+SmolVLM2-2.2B-Instruct,HuggingFaceTB/SmolVLM2-2.2B-Instruct,2.2B,rtx_5090_wsl,retry_strict,/mnt/d/AI/edge-llm-bench/results/figures/camera_v05_sample.jpg,lipstick_presence,96,448x252,11421.11,1213.5,621.36,4629.43,Answer: no,"{ ""answer"": ""no"", ""confidence"": 1, ""reason"": """" }",True,True,True,no,no,True,retry,True,,success
+SmolVLM2-2.2B-Instruct,HuggingFaceTB/SmolVLM2-2.2B-Instruct,2.2B,rtx_5090_wsl,strict_json,/mnt/d/AI/edge-llm-bench/results/figures/camera_v05_sample.jpg,person_fall,96,448x252,11421.11,452.57,355.9,4633.43,No,,False,False,True,no,no,True,yes_no,False,,success
+SmolVLM2-2.2B-Instruct,HuggingFaceTB/SmolVLM2-2.2B-Instruct,2.2B,rtx_5090_wsl,strict_json_fewshot,/mnt/d/AI/edge-llm-bench/results/figures/camera_v05_sample.jpg,person_fall,96,448x252,11421.11,437.93,331.75,4638.96,no,,False,False,True,no,no,True,yes_no,False,,success
+SmolVLM2-2.2B-Instruct,HuggingFaceTB/SmolVLM2-2.2B-Instruct,2.2B,rtx_5090_wsl,yes_no_token,/mnt/d/AI/edge-llm-bench/results/figures/camera_v05_sample.jpg,person_fall,96,448x252,11421.11,446.78,324.94,4629.68,no,,False,False,True,no,no,True,yes_no,False,,success
+SmolVLM2-2.2B-Instruct,HuggingFaceTB/SmolVLM2-2.2B-Instruct,2.2B,rtx_5090_wsl,final_line,/mnt/d/AI/edge-llm-bench/results/figures/camera_v05_sample.jpg,person_fall,96,448x252,11421.11,453.9,331.02,4632.18,NO,,False,False,True,no,no,True,yes_no,False,,success
+SmolVLM2-2.2B-Instruct,HuggingFaceTB/SmolVLM2-2.2B-Instruct,2.2B,rtx_5090_wsl,retry_strict,/mnt/d/AI/edge-llm-bench/results/figures/camera_v05_sample.jpg,person_fall,96,448x252,11421.11,1281.42,732.11,4628.99,No,"{
+    ""answer"": ""white"",
+    ""confidence"": ""100"",
+    ""reason"": ""The controller is white""
+}",True,True,False,white,no,False,retry,True,,success
+SmolVLM2-2.2B-Instruct,HuggingFaceTB/SmolVLM2-2.2B-Instruct,2.2B,rtx_5090_wsl,strict_json,/mnt/d/AI/edge-llm-bench/results/figures/camera_v05_sample.jpg,abnormal_scene,96,448x252,11421.11,463.42,356.63,4632.43,Answer: no,,False,False,True,no,,,yes_no,False,,success
+SmolVLM2-2.2B-Instruct,HuggingFaceTB/SmolVLM2-2.2B-Instruct,2.2B,rtx_5090_wsl,strict_json_fewshot,/mnt/d/AI/edge-llm-bench/results/figures/camera_v05_sample.jpg,abnormal_scene,96,448x252,11421.11,446.86,325.01,4636.94,yes,,False,False,True,yes,,,yes_no,False,,success
+SmolVLM2-2.2B-Instruct,HuggingFaceTB/SmolVLM2-2.2B-Instruct,2.2B,rtx_5090_wsl,yes_no_token,/mnt/d/AI/edge-llm-bench/results/figures/camera_v05_sample.jpg,abnormal_scene,96,448x252,11421.11,471.34,355.03,4629.18,UNKNOWN,,False,False,True,unknown,,,yes_no,False,,success
+SmolVLM2-2.2B-Instruct,HuggingFaceTB/SmolVLM2-2.2B-Instruct,2.2B,rtx_5090_wsl,final_line,/mnt/d/AI/edge-llm-bench/results/figures/camera_v05_sample.jpg,abnormal_scene,96,448x252,11421.11,542.19,424.6,4631.68,FINAL_ANSWER: NO,,False,False,True,no,,,final_line,False,,success
+SmolVLM2-2.2B-Instruct,HuggingFaceTB/SmolVLM2-2.2B-Instruct,2.2B,rtx_5090_wsl,retry_strict,/mnt/d/AI/edge-llm-bench/results/figures/camera_v05_sample.jpg,abnormal_scene,96,448x252,11421.11,1201.21,603.54,4629.43,Answer: no,"{ ""answer"": ""no"", ""confidence"": 1, ""reason"": """" }",True,True,True,no,,,retry,True,,success
+SmolVLM2-2.2B-Instruct,HuggingFaceTB/SmolVLM2-2.2B-Instruct,2.2B,rtx_5090_wsl,strict_json,/mnt/d/AI/edge-llm-bench/results/figures/camera_v05_sample.jpg,general_description,96,448x252,11421.11,676.09,576.86,4628.9,The monitoring frame is a white gaming console with a lot of wires connected to it.,,False,False,False,,,,failed,False,output did not match requested protocol,parse_failed
+SmolVLM2-2.2B-Instruct,HuggingFaceTB/SmolVLM2-2.2B-Instruct,2.2B,rtx_5090_wsl,strict_json_fewshot,/mnt/d/AI/edge-llm-bench/results/figures/camera_v05_sample.jpg,general_description,96,448x252,11421.11,591.65,493.19,4638.77,A white game controller is connected to a computer.,,False,False,False,,,,failed,False,output did not match requested protocol,parse_failed
+SmolVLM2-2.2B-Instruct,HuggingFaceTB/SmolVLM2-2.2B-Instruct,2.2B,rtx_5090_wsl,yes_no_token,/mnt/d/AI/edge-llm-bench/results/figures/camera_v05_sample.jpg,general_description,96,448x252,11421.11,480.44,382.93,4628.71,UNKNOWN,,False,False,True,unknown,,,yes_no,False,,success
+SmolVLM2-2.2B-Instruct,HuggingFaceTB/SmolVLM2-2.2B-Instruct,2.2B,rtx_5090_wsl,final_line,/mnt/d/AI/edge-llm-bench/results/figures/camera_v05_sample.jpg,general_description,96,448x252,11421.11,665.4,545.24,4630.68,FINAL_ANSWER: YES|NO|UNKNOWN,,False,False,True,yes,,,final_line,False,,success
+SmolVLM2-2.2B-Instruct,HuggingFaceTB/SmolVLM2-2.2B-Instruct,2.2B,rtx_5090_wsl,retry_strict,/mnt/d/AI/edge-llm-bench/results/figures/camera_v05_sample.jpg,general_description,96,448x252,11421.11,1537.86,753.51,4632.93,The monitoring frame is a white gaming console with a lot of wires connected to it.,"{
+    ""answer"": ""The monitoring frame is a white gaming console with a lot of wires connected to it.""
+}",True,True,False,the monitoring frame is a white gaming console with a lot of wires connected to it.,,,retry,True,,success
