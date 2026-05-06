@@ -17,6 +17,16 @@ EVENT_IMAGE_DIR = EVENT_ROOT / "images"
 EVENT_LOG_PATH = EVENT_ROOT / "events.jsonl"
 LATEST_SNAPSHOT_PATH = EVENT_ROOT / "latest_snapshot.jpg"
 STORAGE_POLICY_VERSION = "2026-05-retention-v1"
+EDGELOG_SCHEMA_VERSION = "edgelog-v1"
+EDGELOG_EVENT_TYPES = {
+    "person_enter_exit",
+    "roi_intrusion",
+    "object_change",
+    "loitering",
+    "assistant_summary",
+    "privacy_reject",
+    "backend_error",
+}
 
 
 @dataclass(frozen=True)
@@ -86,6 +96,8 @@ def _write_events(records: list[dict[str, Any]]) -> None:
 
 
 def _event_should_persist(event: dict[str, Any]) -> bool:
+    if event.get("event_type") in EDGELOG_EVENT_TYPES:
+        return True
     if event.get("source") in {"event_review", "monitoring_assistant"}:
         return True
     if event.get("user_save") is True:
@@ -237,8 +249,41 @@ def _normalize_event_schema(
 ) -> dict[str, Any]:
     timestamp = event.get("timestamp") or datetime.now(timezone.utc).isoformat()
     sent_to_remote = _infer_sent_to_remote(event)
+    event_type = _infer_event_type(event)
+    objects = event.get("objects")
+    if objects is None:
+        objects = event.get("local_cv_labels") or event.get("detected_labels") or []
+    if isinstance(objects, str):
+        objects = [part.strip() for part in objects.split(",") if part.strip()]
+    semantic_status = event.get("semantic_status") or _infer_semantic_status(event)
+    semantic_description = (
+        event.get("semantic_description")
+        or event.get("final_answer_text")
+        or event.get("full_response")
+        or ""
+    )
+    total_latency = event.get("latency_ms")
+    if total_latency in {None, ""}:
+        total_latency = event.get("total_latency_ms")
     record = {
         **event,
+        "schema_version": EDGELOG_SCHEMA_VERSION,
+        "event_type": event_type,
+        "start_time": event.get("start_time") or timestamp,
+        "end_time": event.get("end_time"),
+        "duration_s": _safe_float(event.get("duration_s"), default=0.0),
+        "status": event.get("status") or "ended",
+        "objects": objects,
+        "roi_name": event.get("roi_name"),
+        "confidence": event.get("confidence"),
+        "risk_level": event.get("risk_level") or _infer_risk_level(event),
+        "semantic_status": semantic_status,
+        "semantic_description": semantic_description,
+        "keyframe_path": event.get("keyframe_path") or image_path or event.get("image_path"),
+        "clip_path": event.get("clip_path"),
+        "backend": event.get("backend") or event.get("selected_backend") or event.get("local_cv_backend") or "",
+        "latency_ms": _safe_float(total_latency, default=None),
+        "created_at": event.get("created_at") or timestamp,
         "timestamp": timestamp,
         "privacy_mode": event.get("privacy_mode") or event.get("privacy"),
         "sent_to_remote": sent_to_remote,
@@ -260,8 +305,58 @@ def _normalize_event_schema(
         )
     if image_path:
         record["image_path"] = image_path
+        record["keyframe_path"] = record.get("keyframe_path") or image_path
         record["stored_image"] = True
     return record
+
+
+def _safe_float(value: Any, *, default: float | None) -> float | None:
+    if value in {None, ""}:
+        return default
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def _infer_event_type(event: dict[str, Any]) -> str:
+    explicit = str(event.get("event_type") or "").strip()
+    if explicit:
+        return explicit
+    if event.get("source") == "monitoring_assistant":
+        return "assistant_summary"
+    if event.get("route") == "reject":
+        if event.get("privacy") == "local_only" or event.get("privacy_mode") == "local_only":
+            return "privacy_reject"
+        return "backend_error"
+    if event.get("status") in {"backend_error", "sample fallback", "failed"}:
+        return "backend_error"
+    return "object_change"
+
+
+def _infer_risk_level(event: dict[str, Any]) -> str:
+    if event.get("risk_level"):
+        return str(event["risk_level"])
+    if event.get("route") == "reject" or event.get("status") in {"backend_error", "failed"}:
+        return "medium"
+    if event.get("alert") is True or event.get("trigger_matched") is True:
+        return "medium"
+    return "low"
+
+
+def _infer_semantic_status(event: dict[str, Any]) -> str:
+    if event.get("event_type") == "assistant_summary" or event.get("source") == "monitoring_assistant":
+        return "completed"
+    review_status = event.get("vlm_review_status")
+    if review_status in {"queued", "running"}:
+        return "pending"
+    if review_status in {"done", "completed"}:
+        return "completed"
+    if review_status in {"failed", "incomplete_generation"}:
+        return "failed"
+    if event.get("route") == "remote" and event.get("final_answer_text"):
+        return "completed"
+    return "not_required"
 
 
 def cleanup_storage(policy: StoragePolicy | None = None) -> None:
@@ -386,6 +481,82 @@ def load_recent_events(limit: int = 50, route_filter: str = "all") -> list[dict[
         records.append(record)
 
     return list(reversed(records[-limit:]))
+
+
+def search_events(
+    query: str = "",
+    *,
+    event_type: str = "all",
+    risk_level: str = "all",
+    semantic_status: str = "all",
+    route_filter: str = "all",
+    limit: int = 50,
+) -> list[dict[str, Any]]:
+    query_terms = [term.lower() for term in query.split() if term.strip()]
+    matches: list[dict[str, Any]] = []
+    for record in _read_events():
+        if event_type != "all" and record.get("event_type") != event_type:
+            continue
+        if risk_level != "all" and record.get("risk_level") != risk_level:
+            continue
+        if semantic_status != "all" and record.get("semantic_status") != semantic_status:
+            continue
+        if route_filter != "all" and record.get("route") != route_filter:
+            continue
+        haystack = " ".join(
+            [
+                str(record.get("event_type", "")),
+                " ".join(str(item) for item in record.get("objects", []) if item),
+                str(record.get("semantic_description", "")),
+                str(record.get("final_answer_text", "")),
+                str(record.get("roi_name", "")),
+                str(record.get("risk_level", "")),
+                str(record.get("status", "")),
+            ]
+        ).lower()
+        if query_terms and not all(term in haystack for term in query_terms):
+            continue
+        matches.append(record)
+    return list(reversed(matches[-limit:]))
+
+
+def build_daily_summary(date_prefix: str | None = None) -> dict[str, Any]:
+    records = _read_events()
+    if date_prefix:
+        records = [
+            record
+            for record in records
+            if str(record.get("start_time") or record.get("timestamp") or "").startswith(date_prefix)
+        ]
+    by_type: dict[str, int] = {}
+    high_risk: list[dict[str, Any]] = []
+    pending: list[dict[str, Any]] = []
+    completed_semantic: list[dict[str, Any]] = []
+    timeline: list[str] = []
+    for record in records:
+        event_type = str(record.get("event_type") or "unknown")
+        by_type[event_type] = by_type.get(event_type, 0) + 1
+        if record.get("risk_level") == "high":
+            high_risk.append(record)
+        if record.get("semantic_status") == "pending":
+            pending.append(record)
+        if record.get("semantic_status") == "completed" and record.get("semantic_description"):
+            completed_semantic.append(record)
+        timeline.append(
+            f"{record.get('start_time') or record.get('timestamp')}: "
+            f"{event_type} route={record.get('route')} "
+            f"risk={record.get('risk_level')} "
+            f"objects={record.get('objects', [])}"
+        )
+    return {
+        "date": date_prefix or "all retained events",
+        "total_events": len(records),
+        "counts_by_type": by_type,
+        "high_risk_events": high_risk,
+        "pending_semantic_reviews": pending,
+        "completed_semantic_descriptions": completed_semantic,
+        "timeline": timeline[-30:],
+    }
 
 
 def update_event(event_id: str, updates: dict[str, Any]) -> dict[str, Any] | None:

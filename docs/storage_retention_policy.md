@@ -1,6 +1,6 @@
-# Monitoring Storage Retention Policy
+# EdgeLog Storage Retention Policy
 
-The Monitoring Workbench is local-first by design. The local YOLO TensorRT path can refresh snapshots repeatedly, but ordinary refresh frames are not kept forever. Only events with operational value are retained.
+EdgeLog is local-first by design. The local YOLO TensorRT path can refresh snapshots repeatedly, but ordinary frames are not kept forever. Only video events with operational value are retained.
 
 ## What Is Saved
 
@@ -12,11 +12,11 @@ Long-term Event History records are saved when one of these conditions is true:
 - a VLM review is queued, running, done, or failed;
 - privacy policy rejects a semantic review;
 - a backend error or sample fallback happens;
-- Monitoring Assistant generates a summary.
+- EdgeLog Daily Summary / Monitoring Assistant generates a summary.
 
 Detection changes during ordinary auto refresh are not retained by themselves. They update latest-snapshot metadata unless the user saves the snapshot or a trigger/review/reject/error condition occurs.
 
-Each saved event can include structured metadata such as labels, boxes, confidence, latency, route, selected backend, privacy mode, reasons, and final answer text.
+Each saved event can include the EdgeLog schema fields: event type, start/end time, duration, objects, ROI name, confidence, risk level, semantic status, semantic description, keyframe path, clip path placeholder, route/backend, latency, privacy mode, and retention metadata.
 
 ## What Is Not Saved
 

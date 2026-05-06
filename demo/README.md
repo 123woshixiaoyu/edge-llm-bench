@@ -1,131 +1,99 @@
-# Monitoring Workbench Demo
+# EdgeLog Demo
 
-This Streamlit demo presents the project as a **Jetson Local-First Monitoring Gateway**:
+EdgeLog is a **local-first video event memory box for semantic search and daily summaries**.
 
-> A local-first edge monitoring workbench that uses Jetson for low-latency local detection and routes event review / summaries to RTX backends only when privacy and system constraints allow.
+The Streamlit app is a product workbench, not a router debugger. Jetson handles the fast path: camera snapshot, YOLO TensorRT, simple event rules, keyframe retention. RTX backends handle async semantic descriptions and optional daily narrative summaries when privacy allows.
 
-The UI is intentionally thin. It calls the existing Jetson Gateway in real mode and reads committed evidence in sample mode. It does not duplicate router policy, download models, start a database, or bypass Jetson to call RTX directly.
+## Pages
 
-## Workbench Pages
+- **Live Event Stream**: capture a snapshot or start a page-local snapshot loop. Jetson YOLO/rules create `person_enter_exit`, `roi_intrusion`, `object_change`, and `loitering` events.
+- **Event Search**: keyword/filter search over local JSONL events by type, objects, ROI, risk, and semantic status.
+- **Daily Summary**: deterministic counts, high-risk events, pending semantic reviews, completed descriptions, and timeline. Optional LLM narrative summary reads only event metadata.
+- **System Status**: Jetson Gateway, local LLM/CV, RTX LLM, and RTX VLM readiness.
+- **Model / Routing Policy**: read-only explanation of Jetson fast path, RTX async semantic path, and privacy reject behavior.
 
-- **Live Monitor**: capture or load a single snapshot and run the Jetson YOLO TensorRT local monitoring fast path.
-- **Event Review**: ask semantic questions about the current/recent snapshot. Privacy-safe mode rejects remote VLM review instead of sending the image out.
-- **Monitoring Assistant**: use the text router for event summaries, routing explanations, and backend status questions.
-- **Event History**: local JSONL event log for detections, reviews, rejects, and assistant summaries.
-- **System Status**: product-language health view for Jetson Gateway, local LLM/CV, RTX LLM, and RTX VLM.
-- **Model Policy**: read-only explanation of why each backend is used.
-
-The workbench uses a sidebar page selector instead of Streamlit tabs. Only the active page runs, so Event Review and Monitoring Assistant actions do not accidentally trigger Live Monitor camera capture.
-
-## Recommended Real-Mode Start
+## Start Real Mode
 
 From the repository root:
 
 ```bash
 python3 demo/run_interactive_stack.py
 python3 demo/check_interactive_stack.py
-```
-
-This starts the RTX-side remote LLM/VLM services, SSH reverse tunnels to Jetson, the Jetson local LLM, and the Jetson Gateway. Runtime logs and PID state are written under `runtime_logs/interactive_stack/`, which is intentionally ignored by git.
-
-Open the workbench separately:
-
-```bash
 streamlit run demo/app.py
 ```
 
-The Streamlit page is usually served at `http://127.0.0.1:8501`. Streamlit itself runs locally, but real backend mode should point to the Jetson Gateway.
+The Streamlit page usually opens at `http://127.0.0.1:8501`. Real mode should point to the Jetson Gateway, defaulting to:
 
-Or start it with the stack:
-
-```bash
-python3 demo/run_interactive_stack.py --with-ui
+```text
+http://192.168.1.102:8000
 ```
 
-When finished:
+Override it if the Jetson IP changes:
+
+```bash
+EDGE_GATEWAY_URL=http://custom-jetson:8000 streamlit run demo/app.py
+```
+
+Stop the launched stack with:
 
 ```bash
 python3 demo/stop_interactive_stack.py
-python3 demo/check_interactive_stack.py
 ```
 
-In the browser, **Router API base URL** defaults to `http://192.168.1.102:8000` for real backend mode. If the Jetson IP changes, override it before starting Streamlit:
+## Sample Mode
 
-```bash
-EDGE_GATEWAY_URL=http://custom-host:8000 streamlit run demo/app.py
-```
+Sample mode reads committed CSV/image evidence and does not require Jetson, RTX, model files, or TensorRT engines. It is evidence playback. Real backend mode calls the Jetson Gateway.
 
-The old manual multi-terminal flow still works as a fallback: start the RTX remote llama-server, RTX VLM server, SSH reverse tunnels, Jetson local llama-server, Jetson Gateway, and Streamlit UI separately.
+## Event Memory And Retention
 
-## Modes
+EdgeLog does not save every auto-refresh frame. Ordinary frames overwrite the latest snapshot only. Long-term history stores:
 
-- **Sample mode**: default. Reads existing result files and the sample camera frame. No Jetson, RTX, model files, or TensorRT engine is required. Some sample rows only store response previews.
-- **Real backend mode**: optional. Live Monitor and Event Review call `/v1/vision/analyze`; Monitoring Assistant calls `/v1/chat/completions`. If the backend is unavailable, the UI shows a friendly error or sample fallback instead of crashing.
+- triggered events
+- local alerts
+- async VLM review events
+- privacy rejects
+- backend errors/fallbacks
+- assistant summaries
+- user-saved snapshots
 
-`max_tokens` controls how many output tokens the selected model may generate. It is separate from `latency_budget_ms`, which is used by the router as a routing constraint. `Request timeout seconds` controls how long the UI waits for a response. The workbench defaults text and vision generation to `1024` output tokens so final answers are less likely to be cut off.
-
-`Request timeout seconds` is the UI client's wait limit for text responses. It is separate from `latency_budget_ms`: if the timeout is too small, the UI may show committed sample fallback even though the backend would have completed with more time.
-
-## Product Flow
-
-- YOLO TensorRT is the local monitoring fast path for snapshot detection/classification.
-- Live Monitor supports a lightweight snapshot loop with Start Monitoring / Stop Monitoring and Capture Once controls. It is not WebRTC or video streaming.
-- Capture latency is camera/frame acquisition plus the gateway capture path; in snapshot mode it can be around 1s. YOLO inference latency is the TensorRT model execution time and is usually around 10-30ms.
-- VLM is an event-level semantic verifier, not the real-time monitoring engine.
-- LLM is the Monitoring Assistant for summaries, policy explanations, and backend status questions.
-- Router decisions remain explicit: local, remote, or reject.
-- History closes the loop: detections, semantic reviews, rejects, and assistant summaries are recorded locally.
-
-## Event-Triggered Review
-
-Live Monitor includes a small rule panel:
-
-- watch label, for example `person`, `bottle`, or `chair`
-- confidence threshold
-- persistence frames
-- cooldown seconds
-- optional VLM confirmation
-- privacy mode
-
-When a rule matches, the workbench records a candidate event. If VLM confirmation is disabled, the candidate becomes a local alert. If VLM confirmation is enabled and privacy allows remote review, a background review job is queued so Live Monitor can continue refreshing. If privacy is `local_only`, the event is recorded as privacy blocked.
-
-The remote VLM prompt requests JSON-only output. If the model only produces thinking/analysis text before the output limit, the event is marked `incomplete_generation` and the raw output is shown only in a debug expander.
-
-## Event History
-
-The demo stores local runtime events in:
+Runtime data is ignored by git:
 
 ```text
 runtime_data/events/events.jsonl
 runtime_data/events/images/
+runtime_data/events/latest_snapshot.jpg
 ```
 
-This directory is intentionally ignored by git. Each event records source, task type, privacy, route, backend, local CV labels, latency, final answer text, reasons, errors, and mode. It is a lightweight product loop, not a production database.
+Default retention:
 
-Auto refresh does not save every frame as a long-term event. Ordinary refreshes only overwrite `runtime_data/events/latest_snapshot.jpg`; alerts, trigger matches, VLM reviews, rejects, backend errors/fallbacks, assistant summaries, and user-saved snapshots are retained. Detection changes alone are treated as latest-snapshot metadata unless the user saves the event or a trigger/review/error occurs. Saved events include retention metadata such as whether an image was stored, whether the frame was sent to the remote workstation, and when the record expires.
+- `MONITORING_MAX_EVENTS=500`
+- `MONITORING_MAX_IMAGES_MB=512`
+- `MONITORING_RETENTION_DAYS=7`
 
-Default storage policy:
+See [../docs/storage_retention_policy.md](../docs/storage_retention_policy.md).
 
-- max events: `500`
-- max retained images: `512 MB`
-- retention window: `7 days`
+## Async VLM Review
 
-Override with `MONITORING_MAX_EVENTS`, `MONITORING_MAX_IMAGES_MB`, and `MONITORING_RETENTION_DAYS`. See [../docs/storage_retention_policy.md](../docs/storage_retention_policy.md).
+VLM is not in the real-time loop. The flow is:
 
-## Real Mode Services
+```text
+event keyframe -> queue semantic review -> RTX VLM -> semantic_status completed/failed
+```
 
-Use `serving/configs_interactive_demo` for the Jetson Gateway. Expected runtime services:
+The UI shows `semantic_status` as `not_required`, `pending`, `completed`, or `failed`. A slow remote VLM request is acceptable because the event has already been created locally.
 
-- Jetson local llama-server: `127.0.0.1:8080`
-- RTX remote llama-server tunnel: `127.0.0.1:18081`
-- Optional RTX remote VLM tunnel: `127.0.0.1:18091`
-- Jetson YOLO TensorRT engine: `/home/rainbow/models/vision/yolo_nano/yolov8n_fp16.engine`
+## Output Budgets
 
-## Current Limits
+- `max_tokens` controls model output length.
+- `latency_budget_ms` controls routing constraints.
+- `Request timeout seconds` controls how long the UI waits.
 
-- This is a workbench demo, not production serving.
-- Sample mode is evidence playback, not live inference.
-- Real vision mode is single-frame interaction, not video streaming.
-- Auto refresh is a Streamlit page-local snapshot loop, not a true real-time video pipeline. If the installed Streamlit version lacks non-blocking fragments, use Capture Once.
-- Remote VLM routes are real when the RTX VLM service/tunnel is running, but they can take 15-20 seconds.
-- No login, database, cloud deploy, video stream, model download, or new benchmark is included.
+Daily summaries do not send video to an LLM. They summarize structured event metadata and completed semantic descriptions.
+
+## Limits
+
+- Single camera, fixed scene.
+- Snapshot loop, not WebRTC/video streaming.
+- Keyframe retention is stable; `clip_path` is reserved for a future ring buffer.
+- Search is JSONL keyword/filter search, not SQLite FTS5 or embeddings yet.
+- No login, cloud deployment, face recognition, or production audit database.

@@ -11,7 +11,16 @@ from typing import Any
 
 import streamlit as st
 
-from event_store import append_event, get_storage_policy, load_recent_events, summarize_recent_events, update_event
+from edgelog_events import EdgeLogConfig, EdgeLogEventEngine, EdgeLogROI
+from event_store import (
+    append_event,
+    build_daily_summary,
+    get_storage_policy,
+    load_recent_events,
+    search_events,
+    summarize_recent_events,
+    update_event,
+)
 from monitoring_rules import MonitoringRule, detection_signature, evaluate_rule
 from output_validation import structured_vlm_prompt
 from sample_results import (
@@ -27,7 +36,7 @@ from sample_results import (
 
 
 st.set_page_config(
-    page_title="Jetson Local-First Monitoring Gateway",
+    page_title="EdgeLog",
     layout="wide",
 )
 
@@ -66,6 +75,12 @@ def ensure_monitoring_rule_config() -> dict[str, Any]:
     if "monitoring_rule_config" not in st.session_state:
         st.session_state["monitoring_rule_config"] = get_default_monitoring_rule_config()
     return st.session_state["monitoring_rule_config"]
+
+
+def ensure_edgelog_engine() -> EdgeLogEventEngine:
+    if "edgelog_event_engine" not in st.session_state:
+        st.session_state["edgelog_event_engine"] = EdgeLogEventEngine()
+    return st.session_state["edgelog_event_engine"]
 
 
 def sync_rule_widgets_from_config(config: dict[str, Any]) -> None:
@@ -129,6 +144,20 @@ def _event_from_result(
     prompt: str = "",
 ) -> dict[str, Any]:
     return {
+        "event_type": result.get("event_type"),
+        "start_time": result.get("start_time"),
+        "end_time": result.get("end_time"),
+        "duration_s": result.get("duration_s"),
+        "objects": result.get("objects"),
+        "roi_name": result.get("roi_name"),
+        "confidence": result.get("confidence"),
+        "risk_level": result.get("risk_level"),
+        "semantic_status": result.get("semantic_status"),
+        "semantic_description": result.get("semantic_description"),
+        "keyframe_path": result.get("keyframe_path"),
+        "clip_path": result.get("clip_path"),
+        "backend": result.get("backend"),
+        "latency_ms": result.get("latency_ms"),
         "source": source,
         "prompt": prompt,
         "task_type": task_type,
@@ -232,6 +261,8 @@ def _ensure_review_worker(api_base_url: str) -> queue.Queue:
                     event_id,
                     {
                         "vlm_review_status": status,
+                        "semantic_status": "completed" if status == "done" else "failed",
+                        "semantic_description": result.get("final_answer_text") or result.get("full_response") or "",
                         "route": result.get("route"),
                         "remote_latency_ms": _as_float(result.get("remote_latency_ms")),
                         "total_latency_ms": _as_float(result.get("total_latency_ms")),
@@ -252,6 +283,7 @@ def _ensure_review_worker(api_base_url: str) -> queue.Queue:
                     event_id,
                     {
                         "vlm_review_status": "failed",
+                        "semantic_status": "failed",
                         "status": "failed",
                         "error": f"VLM review worker failed: {exc}",
                     },
@@ -361,14 +393,13 @@ def _display_final_answer(result: dict[str, Any]) -> None:
 
 def render_header() -> tuple[bool, str]:
     ensure_monitoring_rule_config()
-    st.title("Jetson Local-First Monitoring Gateway")
+    st.title("EdgeLog")
     st.caption(
-        "A local-first edge monitoring workbench that uses Jetson for low-latency local detection "
-        "and routes event review / summaries to RTX backends only when privacy and system constraints allow."
+        "Local-first video event memory box for semantic search and daily summaries."
     )
     st.write(
-        "Live monitoring stays on the Jetson fast path by default. "
-        "Remote LLM/VLM backends are used for event review, summaries, and policy explanations when allowed."
+        "Jetson turns a fixed camera stream into structured events and keyframes. "
+        "RTX backends asynchronously add semantic descriptions and daily summaries only when privacy allows."
     )
 
     left, right = st.columns([1, 2])
@@ -400,6 +431,12 @@ def _run_live_monitor_capture(
     require_vlm_confirmation: bool,
     rule_privacy: str,
     vlm_prompt: str,
+    roi_name: str,
+    roi_x1: float,
+    roi_y1: float,
+    roi_x2: float,
+    roi_y2: float,
+    loitering_threshold_s: float,
     user_save: bool,
 ) -> None:
     if use_sample_mode:
@@ -441,24 +478,70 @@ def _run_live_monitor_capture(
     )
     rule_state = st.session_state.setdefault("monitoring_rule_state", {})
     rule_result = evaluate_rule(_detections(result), rule, rule_state)
+    engine = ensure_edgelog_engine()
+    edge_events = engine.process_frame(
+        _detections(result),
+        config=EdgeLogConfig(
+            roi=EdgeLogROI(
+                name=roi_name,
+                x1=float(roi_x1),
+                y1=float(roi_y1),
+                x2=float(roi_x2),
+                y2=float(roi_y2),
+                normalized=True,
+            ),
+            loitering_threshold_s=float(loitering_threshold_s),
+            cooldown_seconds=float(cooldown_seconds),
+            confidence_threshold=float(confidence_threshold),
+        ),
+    )
+    primary_edge_event = edge_events[0] if edge_events else None
     result["frame_id"] = frame_id
     result["detection_changed"] = detection_changed
-    result["trigger_matched"] = rule_result["trigger_matched"]
+    result["trigger_matched"] = bool(rule_result["trigger_matched"] or primary_edge_event)
     result["vlm_review_status"] = "none"
+    result["edge_events"] = edge_events
 
     if result.get("mode") == "sample fallback":
         st.warning("Real backend unavailable; showing committed sample fallback.")
 
-    if rule_result["trigger_matched"]:
+    if primary_edge_event:
+        result.update(primary_edge_event)
+        st.warning(f"EdgeLog event: {primary_edge_event['event_type']} in {primary_edge_event.get('roi_name') or 'scene'}.")
+    elif rule_result["trigger_matched"]:
+        result.update(
+            {
+                "event_type": "object_change",
+                "start_time": None,
+                "end_time": None,
+                "duration_s": 0.0,
+                "status": "ended",
+                "objects": [label.strip() for label in watch_label.split(",") if label.strip()],
+                "roi_name": roi_name,
+                "confidence": max(
+                    [float(match.get("confidence") or 0.0) for match in rule_result.get("matches", [])] or [0.0]
+                ),
+                "risk_level": "medium",
+                "semantic_status": "not_required",
+                "semantic_description": "",
+                "clip_path": None,
+                "backend": "yolov8n_tensorrt_fp16",
+                "latency_ms": _as_float(result.get("total_latency_ms")),
+            }
+        )
         st.warning("Candidate Event: trigger matched local detection rule.")
+    if result["trigger_matched"]:
         if require_vlm_confirmation and rule_privacy == "allow_remote":
             result["vlm_review_status"] = "queued"
+            result["semantic_status"] = "pending"
             result["sent_to_remote"] = True
             result["final_answer_text"] = "Candidate event queued for workstation VLM review."
         elif require_vlm_confirmation and rule_privacy == "local_only":
             result["vlm_review_status"] = "failed"
+            result["event_type"] = "privacy_reject"
+            result["semantic_status"] = "failed"
             result["route"] = "reject"
-            result["status"] = "privacy_blocked"
+            result["status"] = "ended"
             result["sent_to_remote"] = False
             result["final_answer_text"] = (
                 "Privacy Blocked: semantic review would require sending the image to the remote workstation."
@@ -468,8 +551,8 @@ def _run_live_monitor_capture(
                 *result.get("reasons", []),
             ]
         else:
-            result["status"] = "local_alert"
             result["alert"] = True
+            result["semantic_status"] = result.get("semantic_status") or "not_required"
             result["sent_to_remote"] = False
             result["final_answer_text"] = "Local alert generated from YOLO TensorRT detection rule."
     else:
@@ -519,8 +602,8 @@ def _run_live_monitor_capture(
 
 
 def render_live_monitor(use_sample_mode: bool, api_base_url: str) -> None:
-    st.subheader("Live Monitor")
-    st.write("Capture snapshots and run the local Jetson YOLO TensorRT monitoring fast path.")
+    st.subheader("Live Event Stream")
+    st.write("Turn camera snapshots into local EdgeLog events with Jetson YOLO TensorRT and simple state rules.")
     st.caption(
         "Auto refresh updates the latest snapshot only. Long-term history stores alerts, triggered events, "
         "reviews, rejects, errors/fallbacks, assistant summaries, and user-saved snapshots."
@@ -560,9 +643,9 @@ def render_live_monitor(use_sample_mode: bool, api_base_url: str) -> None:
         with control_cols[1]:
             capture_once = st.button("Capture Once")
         if monitoring_running:
-            st.success("Monitoring is running on this page.")
+            st.success("Event monitoring is running on this page.")
         else:
-            st.info("Monitoring is stopped. Use Capture Once or Start Monitoring.")
+            st.info("Event monitoring is stopped. Use Capture Once or Start Monitoring.")
         if not hasattr(st, "fragment"):
             st.caption(
                 "This Streamlit version does not support non-blocking auto refresh fragments. "
@@ -570,7 +653,7 @@ def render_live_monitor(use_sample_mode: bool, api_base_url: str) -> None:
             )
     with right:
         with st.expander("Advanced routing settings"):
-            task_type = st.selectbox("Task", ["detect", "classify"], index=0, key="live_task")
+            task_type = st.selectbox("Local task", ["detect", "classify"], index=0, key="live_task")
             privacy = st.selectbox("Privacy", ["allow_remote", "local_only"], index=0, key="live_privacy")
             quality = st.selectbox("Quality", ["low", "medium", "high"], index=0, key="live_quality")
             latency_budget_ms = st.number_input(
@@ -589,7 +672,7 @@ def render_live_monitor(use_sample_mode: bool, api_base_url: str) -> None:
                 step=32,
                 key="live_tokens",
             )
-        with st.expander("Event trigger rule"):
+        with st.expander("EdgeLog event rules"):
             active_rule = ensure_monitoring_rule_config()
             if st.session_state.pop("rule_sync_widgets", False) or any(
                 key not in st.session_state for key in RULE_WIDGET_KEYS.values()
@@ -598,7 +681,7 @@ def render_live_monitor(use_sample_mode: bool, api_base_url: str) -> None:
             if st.session_state.get("rule_status_message"):
                 st.success(st.session_state.pop("rule_status_message"))
             st.caption(
-                "Edit values, then click Save Rule to apply them to monitoring. "
+                "Edit values, then click Save Rule to apply them to event monitoring. "
                 "Current active rule is used for Capture Once and Start Monitoring."
             )
             st.info(
@@ -613,6 +696,19 @@ def render_live_monitor(use_sample_mode: bool, api_base_url: str) -> None:
             st.slider("Confidence threshold", min_value=0.0, max_value=1.0, step=0.05, key="rule_confidence_threshold")
             st.number_input("Persistence frames", min_value=1, max_value=10, step=1, key="rule_persistence_frames")
             st.number_input("Cooldown seconds", min_value=0, max_value=300, step=5, key="rule_cooldown_seconds")
+            roi_name = st.text_input("ROI name", value="watch_zone", key="edgelog_roi_name")
+            roi_cols = st.columns(4)
+            roi_x1 = roi_cols[0].number_input("ROI x1", min_value=0.0, max_value=1.0, value=0.25, step=0.05)
+            roi_y1 = roi_cols[1].number_input("ROI y1", min_value=0.0, max_value=1.0, value=0.25, step=0.05)
+            roi_x2 = roi_cols[2].number_input("ROI x2", min_value=0.0, max_value=1.0, value=0.75, step=0.05)
+            roi_y2 = roi_cols[3].number_input("ROI y2", min_value=0.0, max_value=1.0, value=0.75, step=0.05)
+            loitering_threshold_s = st.number_input(
+                "Loitering threshold seconds",
+                min_value=2,
+                max_value=600,
+                value=10,
+                step=1,
+            )
             st.checkbox("Require VLM confirmation", key="rule_require_vlm_confirmation")
             st.radio("Review privacy", ["allow_remote", "local_only"], horizontal=True, key="rule_privacy")
             st.text_area(
@@ -632,6 +728,7 @@ def render_live_monitor(use_sample_mode: bool, api_base_url: str) -> None:
                     st.session_state["monitoring_rule_config"] = default_rule
                     st.session_state["rule_sync_widgets"] = True
                     st.session_state["monitoring_rule_state"] = {}
+                    ensure_edgelog_engine().reset()
                     st.session_state["last_detection_signature"] = None
                     st.session_state["rule_status_message"] = "Rule reset to default"
                     st.rerun()
@@ -656,6 +753,12 @@ def render_live_monitor(use_sample_mode: bool, api_base_url: str) -> None:
             require_vlm_confirmation=bool(active_rule["require_vlm_confirmation"]),
             rule_privacy=str(active_rule["privacy"]),
             vlm_prompt=str(active_rule["vlm_prompt"]),
+            roi_name=roi_name,
+            roi_x1=float(roi_x1),
+            roi_y1=float(roi_y1),
+            roi_x2=float(roi_x2),
+            roi_y2=float(roi_y2),
+            loitering_threshold_s=float(loitering_threshold_s),
             user_save=user_save,
         )
 
@@ -670,6 +773,26 @@ def render_live_monitor(use_sample_mode: bool, api_base_url: str) -> None:
             capture()
 
         live_monitor_fragment()
+
+    st.markdown("#### Recent EdgeLog events")
+    recent_events = load_recent_events(limit=5)
+    if not recent_events:
+        st.caption("No retained events yet. Ordinary frames update only the latest snapshot.")
+    else:
+        st.dataframe(
+            [
+                {
+                    "time": event.get("start_time") or event.get("timestamp"),
+                    "event_type": event.get("event_type"),
+                    "status": event.get("status"),
+                    "risk": event.get("risk_level"),
+                    "semantic": event.get("semantic_status"),
+                    "objects": ", ".join(str(item) for item in event.get("objects", [])),
+                }
+                for event in recent_events
+            ],
+            use_container_width=True,
+        )
 
 
 def render_event_review(use_sample_mode: bool, api_base_url: str) -> None:
@@ -932,6 +1055,123 @@ def render_event_history() -> None:
             st.json(event)
 
 
+def render_event_search() -> None:
+    st.subheader("Event Search")
+    st.write("Search retained EdgeLog events by type, object labels, ROI, risk, and semantic description.")
+    left, right = st.columns([2, 1])
+    with left:
+        query = st.text_input("Search events", placeholder="person, watch_zone, completed description...")
+    with right:
+        event_type = st.selectbox(
+            "Event type",
+            [
+                "all",
+                "person_enter_exit",
+                "roi_intrusion",
+                "object_change",
+                "loitering",
+                "assistant_summary",
+                "privacy_reject",
+                "backend_error",
+            ],
+        )
+        risk_level = st.selectbox("Risk", ["all", "low", "medium", "high"])
+        semantic_status = st.selectbox(
+            "Semantic status",
+            ["all", "not_required", "pending", "completed", "failed"],
+        )
+    results = search_events(
+        query,
+        event_type=event_type,
+        risk_level=risk_level,
+        semantic_status=semantic_status,
+        limit=50,
+    )
+    st.caption(
+        "MVP search uses local JSONL keyword/filter matching. It can be upgraded later to SQLite FTS5, embeddings, or FAISS."
+    )
+    if not results:
+        st.info("No matching events found.")
+        return
+    st.dataframe(
+        [
+            {
+                "start_time": event.get("start_time"),
+                "event_type": event.get("event_type"),
+                "risk": event.get("risk_level"),
+                "semantic_status": event.get("semantic_status"),
+                "objects": ", ".join(str(item) for item in event.get("objects", [])),
+                "roi": event.get("roi_name"),
+                "description": event.get("semantic_description") or event.get("final_answer_text"),
+            }
+            for event in results
+        ],
+        use_container_width=True,
+    )
+    for event in results[:10]:
+        with st.expander(f"{event.get('event_type')} | {event.get('start_time')} | {event.get('risk_level')}"):
+            image_path = event.get("keyframe_path") or event.get("image_path")
+            if event.get("image_missing"):
+                st.info("Image expired by retention policy.")
+            elif image_path and Path(image_path).exists():
+                st.image(image_path, caption="Event keyframe", use_container_width=True)
+            st.write(event.get("semantic_description") or event.get("final_answer_text") or "No semantic description yet.")
+            st.json(event)
+
+
+def render_daily_summary(use_sample_mode: bool, api_base_url: str) -> None:
+    st.subheader("Daily Summary")
+    st.write("Generate a day-level summary from structured event metadata, not from raw video.")
+    today = time.strftime("%Y-%m-%d")
+    date_prefix = st.text_input("Date prefix", value=today)
+    summary = build_daily_summary(date_prefix or None)
+    st.metric("Total retained events", summary["total_events"])
+    cols = st.columns(3)
+    cols[0].metric("High risk events", len(summary["high_risk_events"]))
+    cols[1].metric("Pending semantic reviews", len(summary["pending_semantic_reviews"]))
+    cols[2].metric("Completed semantic descriptions", len(summary["completed_semantic_descriptions"]))
+    st.markdown("#### Counts by type")
+    st.json(summary["counts_by_type"])
+    st.markdown("#### Timeline")
+    st.text("\n".join(summary["timeline"]) or "No retained events for this date.")
+
+    if st.button("Generate narrative summary with Monitoring Assistant"):
+        prompt = (
+            "You are EdgeLog's Monitoring Assistant. Generate a concise daily summary from this "
+            "structured event table only. Do not infer from video that is not listed.\n\n"
+            f"{summary}"
+        )
+        if use_sample_mode:
+            result = select_text_sample(prompt, "summary", "allow_remote", "medium", 10000)
+        else:
+            result = call_text_backend(
+                api_base_url,
+                prompt,
+                "summary",
+                "allow_remote",
+                "medium",
+                10000,
+                1024,
+                120.0,
+            )
+        if result.get("mode") == "sample fallback":
+            st.warning("Real backend unavailable; showing committed sample fallback.")
+        st.text_area("Narrative daily summary", value=result.get("full_response") or result.get("response_preview", ""), height=260)
+        event = _record_event(
+            source="monitoring_assistant",
+            result={
+                **result,
+                "event_type": "assistant_summary",
+                "semantic_status": "completed",
+                "semantic_description": result.get("full_response") or result.get("response_preview", ""),
+            },
+            task_type="summary",
+            privacy="allow_remote",
+            prompt=prompt,
+        )
+        st.caption(f"Recorded summary event {event['event_id']} in local history.")
+
+
 def _status_label(ready: bool | None, mock: bool | None = None) -> str:
     if mock:
         return "Mock"
@@ -979,25 +1219,26 @@ def render_system_status(use_sample_mode: bool, api_base_url: str) -> None:
 
 
 def render_model_policy() -> None:
-    st.subheader("Model Policy")
-    st.write("Read-only explanation of the current monitoring backend choices.")
+    st.subheader("Model / Routing Policy")
+    st.write("Read-only explanation of how EdgeLog splits real-time event memory from asynchronous semantic review.")
 
     st.markdown(
         """
 | Role | Default backend | Product meaning |
 | --- | --- | --- |
-| Jetson text default | Qwen3.5 0.8B Q4 | Local monitoring assistant responses when the task is short/private. |
-| RTX text fallback | Qwen3.5 4B Q4 | Heavier summaries, code/reasoning, and high-quality text review. |
-| Jetson local CV | YOLOv8n TensorRT FP16 | Local monitoring fast path for snapshots and object detection. |
+| Jetson local CV | YOLOv8n TensorRT FP16 | Real-time event trigger path for person enter/exit, ROI intrusion, object change, and loitering. |
+| Jetson text default | Qwen3.5 0.8B Q4 | Local assistant responses when a summary/policy question should stay on the device. |
+| RTX text fallback | Qwen3.5 4B Q4 | Heavier daily summaries and high-quality text review. |
+| RTX semantic vision | Gemma 4 E2B-it Q4 + mmproj | Asynchronous event-level semantic descriptions after an event is already saved. |
 | MobileNet-SSD | OpenCV DNN baseline | v0.5 system integration baseline and fallback reference. |
-| RTX semantic vision | Gemma 4 E2B-it Q4 + mmproj | Event review and VQA when privacy permits image offload. |
 """
     )
     st.markdown(
         """
+- EdgeLog does not run VLM on every frame. VLM is an async semantic annotator for saved events.
+- Local-only privacy blocks semantic offload and records a reject event instead.
 - INT8 is treated as an experimental optimization because detection drift keeps it out of the default product path.
-- The C++ worker is a hot-path exploration, not the default workbench runtime.
-- The router keeps local / remote / reject decisions explicit so privacy and system constraints remain visible.
+- The C++ worker is a hot-path exploration, not the default EdgeLog runtime.
 """
     )
 
@@ -1005,29 +1246,26 @@ def render_model_policy() -> None:
 def main() -> None:
     use_sample_mode, api_base_url = render_header()
     pages = [
-        "Live Monitor",
-        "Event Review",
-        "Monitoring Assistant",
-        "Event History",
+        "Live Event Stream",
+        "Event Search",
+        "Daily Summary",
         "System Status",
-        "Model Policy",
+        "Model / Routing Policy",
     ]
     page = st.sidebar.radio("Workbench page", pages, index=0)
-    st.session_state["monitor_page_active"] = page == "Live Monitor"
-    if page != "Live Monitor" and st.session_state.get("monitoring_running"):
-        st.sidebar.info("Live Monitor is paused while another page is active.")
+    st.session_state["monitor_page_active"] = page == "Live Event Stream"
+    if page != "Live Event Stream" and st.session_state.get("monitoring_running"):
+        st.sidebar.info("Live Event Stream is paused while another page is active.")
 
-    if page == "Live Monitor":
+    if page == "Live Event Stream":
         render_live_monitor(use_sample_mode, api_base_url)
-    elif page == "Event Review":
-        render_event_review(use_sample_mode, api_base_url)
-    elif page == "Monitoring Assistant":
-        render_monitoring_assistant(use_sample_mode, api_base_url)
-    elif page == "Event History":
-        render_event_history()
+    elif page == "Event Search":
+        render_event_search()
+    elif page == "Daily Summary":
+        render_daily_summary(use_sample_mode, api_base_url)
     elif page == "System Status":
         render_system_status(use_sample_mode, api_base_url)
-    elif page == "Model Policy":
+    elif page == "Model / Routing Policy":
         render_model_policy()
 
 

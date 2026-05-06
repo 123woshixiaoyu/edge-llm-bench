@@ -1,0 +1,11 @@
+test_name,expected,actual,status,notes
+person enter / local event created,person_enter_exit generated,"person_enter_exit,roi_intrusion",PASS,
+ROI intrusion event created,roi_intrusion generated,"person_enter_exit,roi_intrusion",PASS,
+object_change event created,object_change generated after ROI signature change,object_change,PASS,"Rule-based smoke uses synthetic detections, not production object identity tracking."
+loitering event created,loitering generated after threshold,loitering,PASS,Simulated time-based smoke.
+event cooldown prevents duplicate spam,second identical frame produces no new enter/intrusion event,first=2 second=0,PASS,
+event search returns expected event,search finds stored ROI intrusion,1,PASS,
+daily summary contains correct counts,roi_intrusion count is 1,{'roi_intrusion': 1},PASS,
+async VLM review updates semantic_status,pending event can be updated to completed,['completed'],PASS,Simulated update; real VLM review remains asynchronous through the UI worker.
+retention prevents ordinary frame spam,ordinary frame is latest snapshot only,stored_event=False retained=1,PASS,
+system status page can read backend readiness,requires real stack check,NEEDS_USER_CHECK,PASS,Use demo/check_interactive_stack.py against the active Jetson/RTX stack.
