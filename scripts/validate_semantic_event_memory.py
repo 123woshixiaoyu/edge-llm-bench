@@ -200,7 +200,7 @@ def run_validation() -> list[dict[str, Any]]:
             rows,
             "search returns verified semantic event",
             "verified semantic event found",
-            str([event.get("event_id") for event in found]),
+            f"found={len(found)}",
             len(found) == 1 and found[0].get("event_id") == stored_yes.get("event_id"),
         )
 

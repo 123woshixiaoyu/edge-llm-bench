@@ -175,6 +175,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--jetson-project", default="/home/rainbow/edge-llm-bench")
     parser.add_argument("--gateway-url", default="http://192.168.1.102:8000")
     parser.add_argument("--skip-remote-vlm", action="store_true")
+    parser.add_argument("--skip-fast-vlm-verifier", action="store_true")
     parser.add_argument("--skip-remote-llm", action="store_true")
     parser.add_argument("--skip-local-llm", action="store_true")
     parser.add_argument("--skip-gateway", action="store_true")
@@ -224,6 +225,33 @@ def main() -> int:
             )
     else:
         services["remote_vlm"] = {"name": "remote_vlm", "status": "skipped", "managed": False}
+
+    if not args.skip_fast_vlm_verifier:
+        ok, _, _ = http_json("http://127.0.0.1:8092/health", timeout_s=8)
+        if ok:
+            services["fast_vlm_verifier"] = record_already_ready(
+                "fast_vlm_verifier",
+                "local",
+                pgrep("run_fast_vlm_verifier_5090.py"),
+                "http://127.0.0.1:8092/health",
+            )
+        else:
+            python_bin = REPO_ROOT / ".venv-vlm" / "bin" / "python"
+            python_cmd = str(python_bin) if python_bin.exists() else "python3"
+            services["fast_vlm_verifier"] = start_local(
+                "fast_vlm_verifier",
+                [
+                    python_cmd,
+                    "serving/scripts/run_fast_vlm_verifier_5090.py",
+                    "--host",
+                    "127.0.0.1",
+                    "--port",
+                    "8092",
+                ],
+                "fast_vlm_verifier.log",
+            )
+    else:
+        services["fast_vlm_verifier"] = {"name": "fast_vlm_verifier", "status": "skipped", "managed": False}
 
     tunnel_forwards: list[str] = []
     if not args.skip_remote_llm:
@@ -313,6 +341,9 @@ def main() -> int:
     if not args.skip_remote_vlm:
         ok, data, error = wait_http_json("http://127.0.0.1:8091/health", timeout_s=60)
         health["remote_vlm"] = {"ready": ok, "data": data, "error": error}
+    if not args.skip_fast_vlm_verifier:
+        ok, data, error = wait_http_json("http://127.0.0.1:8092/health", timeout_s=90)
+        health["fast_vlm_verifier"] = {"ready": ok and bool((data or {}).get("ready", ok)), "data": data, "error": error}
 
     print("Waiting for Jetson Gateway...")
     if not args.skip_gateway:

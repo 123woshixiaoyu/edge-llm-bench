@@ -26,6 +26,7 @@ Expected services:
 - Jetson Gateway on `192.168.1.102:8000`
 - RTX remote LLM through Jetson tunnel `127.0.0.1:18081`
 - RTX remote VLM through Jetson tunnel `127.0.0.1:18091`
+- RTX SmolVLM2 fast verifier on `127.0.0.1:8092`
 - YOLO TensorRT engine at `/home/rainbow/models/vision/yolo_nano/yolov8n_fp16.engine`
 
 The Streamlit UI runs locally, usually at `http://127.0.0.1:8501`, but real backend mode should point to the Jetson Gateway.
@@ -44,7 +45,7 @@ The Streamlit UI runs locally, usually at `http://127.0.0.1:8501`, but real back
 | Model / signal | Role |
 | --- | --- |
 | YOLOv8n TensorRT / motion / ROI / scene change | Cheap candidate trigger. Not final event understanding. |
-| SmolVLM2 | Fast semantic verifier candidate using FINAL_ANSWER yes/no protocol. Not default live service yet. |
+| SmolVLM2 | RTX fast semantic verifier using FINAL_ANSWER yes/no protocol on port 8092. |
 | Gemma VLM | Slow async semantic describer for verified or high-value events. |
 | Qwen text LLM | Daily summary and search assistant over event metadata. |
 
@@ -86,6 +87,6 @@ These are ignored by git.
 
 - Single camera and fixed scene.
 - Snapshot loop, not video streaming.
-- Mock verifier workflow until SmolVLM2 service integration.
+- Mock verifier is available offline; `smolvlm2_fast` calls the live RTX service when it is running.
 - Keyframes are retained; `clip_path` is reserved for future ring buffer.
 - Search is JSONL keyword/filter search, not SQLite FTS5 or embeddings.

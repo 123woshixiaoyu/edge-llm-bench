@@ -77,6 +77,7 @@ def main() -> int:
     endpoints = {
         "remote_llm": "http://127.0.0.1:8081/health",
         "remote_vlm": "http://127.0.0.1:8091/health",
+        "fast_vlm_verifier": "http://127.0.0.1:8092/health",
         "jetson_gateway": f"{gateway_url}/health",
     }
     print("\nHealth endpoints:")
@@ -111,7 +112,10 @@ def main() -> int:
                 and (remote_vlm_skipped or vision_remote_is_mock is False)
             )
         elif data:
-            print(f"  status={data.get('status', 'ok')} model={data.get('model')}")
+            print(f"  status={data.get('status', 'ok')} model={data.get('model')} backend={data.get('backend')}")
+            if "ready" in data:
+                print(f"  ready={data.get('ready')} device={data.get('device')}")
+                endpoint_ready = ok and data.get("ready") is not False
         if error and not ok:
             print(f"  error={error}")
         if ok and name == "jetson_gateway" and not endpoint_ready:

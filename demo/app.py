@@ -34,7 +34,7 @@ from sample_results import (
     select_text_sample,
     select_vision_sample,
 )
-from vlm_verifier import MockSemanticVerifier, verification_to_dict
+from vlm_verifier import verification_to_dict, verifier_for_backend
 
 
 st.set_page_config(
@@ -532,6 +532,10 @@ def _run_live_monitor_capture(
         result["proposal_id"] = primary_edge_event.get("proposal", {}).get("proposal_id")
         result["trigger_type"] = primary_edge_event.get("proposal", {}).get("trigger_type")
         result["proposal_reason"] = primary_edge_event.get("proposal", {}).get("proposal_reason")
+        result.setdefault("proposal", {})["keyframe_path"] = (
+            image_for_display if isinstance(image_for_display, str) else None
+        )
+        result.setdefault("proposal", {})["image_base64"] = result.get("image_base64")
         st.warning(
             f"Candidate proposal: {primary_edge_event['event_type']} in "
             f"{primary_edge_event.get('roi_name') or 'scene'}."
@@ -551,7 +555,8 @@ def _run_live_monitor_capture(
                     "confidence": max(
                         [float(match.get("confidence") or 0.0) for match in rule_result.get("matches", [])] or [0.0]
                     ),
-                    "keyframe_path": None,
+                    "keyframe_path": image_for_display if isinstance(image_for_display, str) else None,
+                    "image_base64": result.get("image_base64"),
                     "clip_path": None,
                 },
                 "start_time": None,
@@ -577,11 +582,20 @@ def _run_live_monitor_capture(
         st.warning("Candidate proposal: cheap YOLO label trigger matched.")
     if result["trigger_matched"]:
         proposal = result.get("proposal") or {}
+        if not proposal.get("keyframe_path") and isinstance(image_for_display, str):
+            proposal["keyframe_path"] = image_for_display
+        if not proposal.get("image_base64") and result.get("image_base64"):
+            proposal["image_base64"] = result.get("image_base64")
+        verifier = verifier_for_backend(
+            semantic_rule.verifier_backend,
+            base_url=os.environ.get("EDGELOG_FAST_VLM_URL", "http://127.0.0.1:8092"),
+        )
         verification_result = verification_to_dict(
-            MockSemanticVerifier().verify(
+            verifier.verify(
                 {
                     "natural_language_rule": semantic_rule.natural_language_rule,
                     "rule_name": semantic_rule.rule_name,
+                    "max_new_tokens": 32,
                 },
                 proposal,
             )
@@ -1245,10 +1259,10 @@ def render_event_rules() -> None:
         )
         verifier_backend = cols[2].selectbox(
             "Verifier backend",
-            ["mock_final_line", "smolvlm2_fast_candidate", "gemma_vlm"],
+            ["mock_final_line", "smolvlm2_fast", "gemma_vlm"],
             index=0
-            if current["verifier_backend"] not in {"smolvlm2_fast_candidate", "gemma_vlm"}
-            else ["mock_final_line", "smolvlm2_fast_candidate", "gemma_vlm"].index(current["verifier_backend"]),
+            if current["verifier_backend"] not in {"smolvlm2_fast", "gemma_vlm"}
+            else ["mock_final_line", "smolvlm2_fast", "gemma_vlm"].index(current["verifier_backend"]),
         )
         cols2 = st.columns(2)
         min_trigger_interval_s = cols2[0].number_input(
@@ -1278,8 +1292,8 @@ def render_event_rules() -> None:
         ensure_edgelog_engine().reset()
         st.rerun()
     st.info(
-        "SmolVLM2 is a fast verifier candidate based on the benchmark, but it is not a default service integration here. "
-        "This workflow uses mock FINAL_ANSWER validation unless a verifier service is connected later."
+        "Choose smolvlm2_fast to call the RTX verifier service at EDGELOG_FAST_VLM_URL "
+        "(default http://127.0.0.1:8092). Mock remains available for offline workflow testing."
     )
     st.markdown(
         """
@@ -1403,7 +1417,7 @@ def render_model_policy() -> None:
 | Role | Default backend | Product meaning |
 | --- | --- | --- |
 | Cheap candidate trigger | YOLOv8n TensorRT FP16 / ROI / change rules | Proposes that something may have happened; not final event understanding. |
-| Fast semantic verifier | SmolVLM2 final-line candidate / mock workflow | Answers YES / NO / UNKNOWN for user-defined event rules. |
+| Fast semantic verifier | RTX SmolVLM2 final-line service / mock workflow | Answers YES / NO / UNKNOWN for user-defined event rules. |
 | Slow semantic describer | Gemma 4 E2B-it Q4 + mmproj | Asynchronous descriptions for verified or high-value events. |
 | Daily summary assistant | Qwen text LLM local/remote | Summarizes structured event tables, not video frames. |
 | MobileNet-SSD | OpenCV DNN baseline | v0.5 system integration baseline and fallback reference. |
@@ -1412,7 +1426,7 @@ def render_model_policy() -> None:
     st.markdown(
         """
 - EdgeLog does not store YOLO object logs as the product result. YOLO is only a cheap trigger.
-- SmolVLM2 is not treated as a free-form describer or strict JSON backend. Its useful protocol is FINAL_ANSWER yes/no verification.
+- SmolVLM2 is not treated as a free-form describer or strict JSON backend. Its live RTX service uses FINAL_ANSWER yes/no verification.
 - Gemma VLM is slow and reserved for asynchronous event description.
 - Local-only privacy blocks semantic offload and records a reject event instead.
 - INT8 is treated as an experimental optimization because detection drift keeps it out of the default product path.

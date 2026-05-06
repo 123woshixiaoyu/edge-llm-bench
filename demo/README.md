@@ -11,7 +11,7 @@ The demo is not a YOLO object log and not a router debugger. YOLO/motion/ROI cha
 - **Event Search**: search semantic events by rule, object evidence, ROI, risk, verifier answer, and description.
 - **Daily Summary**: summarize verified/high-risk/unknown events from structured records, not from raw video.
 - **System Status**: Jetson Gateway, local LLM/CV, RTX LLM, and RTX VLM readiness.
-- **Model / Routing Policy**: explains YOLO as trigger, SmolVLM2 as fast verifier candidate, Gemma as slow describer, and Qwen as summary assistant.
+- **Model / Routing Policy**: explains YOLO as trigger, SmolVLM2 as fast verifier, Gemma as slow describer, and Qwen as summary assistant.
 
 ## Start Real Mode
 
@@ -21,6 +21,12 @@ From the repository root:
 python3 demo/run_interactive_stack.py
 python3 demo/check_interactive_stack.py
 streamlit run demo/app.py
+```
+
+The stack launcher also starts the optional RTX fast verifier when `.venv-vlm` is available:
+
+```text
+SmolVLM2 verifier: http://127.0.0.1:8092
 ```
 
 The Streamlit page usually opens at `http://127.0.0.1:8501`. Real mode should point to the Jetson Gateway, defaulting to:
@@ -49,7 +55,7 @@ Allowed answers are `YES`, `NO`, and `UNKNOWN`. Strict JSON is intentionally not
 Current implementation:
 
 - `mock_final_line` validates the workflow without adding a new service.
-- `smolvlm2_fast_candidate` is documented from benchmark evidence but is not yet connected as a default live service.
+- `smolvlm2_fast` calls the RTX SmolVLM2 verifier service at `EDGELOG_FAST_VLM_URL` or `http://127.0.0.1:8092`.
 - Gemma VLM remains the slower async describer for confirmed/high-value events.
 
 ## Event Memory And Retention
@@ -84,7 +90,7 @@ Daily summaries read event metadata and completed semantic descriptions. They do
 
 - Single camera, fixed scene.
 - Snapshot loop, not WebRTC/video streaming.
-- Fast verifier is mock-integrated until a SmolVLM2 service is explicitly connected.
+- Fast verifier real mode requires the RTX SmolVLM2 service; mock mode remains available for offline demos.
 - Keyframe retention is stable; `clip_path` is reserved for a future ring buffer.
 - Search is JSONL keyword/filter search, not SQLite FTS5 or embeddings yet.
 - No login, cloud deployment, face recognition, or production audit database.

@@ -8,7 +8,7 @@ This validation checks EdgeLog's semantic event workflow:
 cheap trigger -> proposal -> verifier YES/NO/UNKNOWN -> semantic event memory -> search/daily summary
 ```
 
-It does not connect a new SmolVLM2 service and does not replace the gateway. The verifier is a mock FINAL_ANSWER adapter used to validate the workflow. Existing SmolVLM2 benchmark docs provide latency/protocol evidence for future real integration.
+This validation keeps using the mock FINAL_ANSWER adapter so the semantic workflow can be tested without external services. Live RTX SmolVLM2 integration is validated separately in `docs/smolvlm2_fast_verifier_integration.md` and `serving/results/raw/smolvlm2_fast_verifier_validation.csv`.
 
 ## Result Artifact
 
@@ -32,14 +32,15 @@ It does not connect a new SmolVLM2 service and does not replace the gateway. The
 
 ## SmolVLM2 Status
 
-SmolVLM2 is not integrated as a default live service in this commit.
+SmolVLM2-256M is now available as a live RTX fast-verifier service when `verifier_backend=smolvlm2_fast` and the `127.0.0.1:8092` service is running.
 
 Current evidence:
 
 - `serving/docs/fast_vlm_verifier_benchmark.md`: compact SmolVLM2 models are sub-second on RTX but poor at strict JSON.
 - `serving/docs/vlm_output_robustness.md`: simpler FINAL_ANSWER/final-line protocols are more suitable.
+- `docs/smolvlm2_fast_verifier_integration.md`: live 256M service passed YES / NO / UNKNOWN, fallback, and EdgeLog promotion validation.
 
-Conclusion: SmolVLM2 is a promising fast semantic verifier candidate, not a free-form describer and not a strict JSON backend. Real service integration is a future step.
+Conclusion: SmolVLM2 is now a real fast semantic verifier path on RTX, not a free-form describer and not a strict JSON backend.
 
 ## Gateway Impact
 

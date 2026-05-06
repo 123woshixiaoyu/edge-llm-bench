@@ -1,9 +1,14 @@
 from __future__ import annotations
 
+import base64
+import json
 import re
 import time
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
+import urllib.error
+import urllib.request
 
 
 FINAL_RE = re.compile(r"FINAL_ANSWER\s*:\s*(YES|NO|UNKNOWN)\b", re.IGNORECASE)
@@ -97,6 +102,87 @@ class MockSemanticVerifier:
             latency_ms=round((time.perf_counter() - start) * 1000, 2),
             raw_output=raw,
         )
+
+
+class SmolVLM2FastVerifier:
+    """HTTP adapter for the RTX SmolVLM2 FINAL_ANSWER verifier service."""
+
+    def __init__(self, base_url: str = "http://127.0.0.1:8092", *, timeout_s: float = 8.0) -> None:
+        self.base_url = base_url.rstrip("/")
+        self.timeout_s = timeout_s
+
+    def verify(self, rule: dict[str, Any], proposal: dict[str, Any]) -> VerificationResult:
+        start = time.perf_counter()
+        payload: dict[str, Any] = {
+            "rule": rule.get("natural_language_rule") or rule.get("rule_name") or "",
+            "question": "Does this candidate frame show that event?",
+            "roi_name": proposal.get("roi_name"),
+            "proposal_reason": proposal.get("proposal_reason") or "",
+            "objects": proposal.get("objects") or [],
+            "max_new_tokens": int(rule.get("max_new_tokens") or 32),
+            "timeout_s": self.timeout_s,
+        }
+        if proposal.get("image_base64"):
+            payload["image_base64"] = proposal.get("image_base64")
+        image_path = proposal.get("keyframe_path")
+        if image_path and "image_base64" not in payload:
+            path = Path(str(image_path))
+            if path.exists():
+                try:
+                    payload["image_base64"] = base64.b64encode(path.read_bytes()).decode("ascii")
+                except OSError as exc:
+                    return VerificationResult(
+                        verifier_backend="smolvlm2_fast",
+                        semantic_status="failed",
+                        final_answer="",
+                        reason="",
+                        latency_ms=round((time.perf_counter() - start) * 1000, 2),
+                        raw_output="",
+                        error=f"could not read keyframe for verifier: {exc}",
+                    )
+            else:
+                payload["image_path"] = str(image_path)
+
+        request = urllib.request.Request(
+            f"{self.base_url}/v1/verify_event",
+            data=json.dumps(payload).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        try:
+            with urllib.request.urlopen(request, timeout=self.timeout_s + 2.0) as response:
+                data = json.loads(response.read().decode("utf-8"))
+        except (urllib.error.URLError, TimeoutError, json.JSONDecodeError, OSError) as exc:
+            return VerificationResult(
+                verifier_backend="smolvlm2_fast",
+                semantic_status="failed",
+                final_answer="",
+                reason="",
+                latency_ms=round((time.perf_counter() - start) * 1000, 2),
+                raw_output="",
+                error=f"SmolVLM2 verifier unavailable: {exc}",
+            )
+
+        error = str(data.get("error") or "")
+        final_answer = str(data.get("final_answer") or "").upper()
+        semantic_status = final_answer.lower() if final_answer in {"YES", "NO", "UNKNOWN"} else "failed"
+        if not data.get("parse_success") and not error:
+            error = "SmolVLM2 output did not match FINAL_ANSWER protocol"
+        return VerificationResult(
+            verifier_backend=str(data.get("backend") or "smolvlm2_fast"),
+            semantic_status=semantic_status if not error else "failed",
+            final_answer=final_answer if not error else "",
+            reason=str(data.get("reason") or ""),
+            latency_ms=float(data.get("latency_ms") or round((time.perf_counter() - start) * 1000, 2)),
+            raw_output=str(data.get("raw_text") or ""),
+            error=error,
+        )
+
+
+def verifier_for_backend(backend: str, *, base_url: str = "http://127.0.0.1:8092") -> MockSemanticVerifier | SmolVLM2FastVerifier:
+    if backend == "smolvlm2_fast":
+        return SmolVLM2FastVerifier(base_url)
+    return MockSemanticVerifier()
 
 
 def verification_to_dict(result: VerificationResult) -> dict[str, Any]:

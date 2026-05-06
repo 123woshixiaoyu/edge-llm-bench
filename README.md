@@ -39,7 +39,7 @@ Single camera, fixed scene, semantic event memory:
 | Layer | Responsibility | Current implementation |
 | --- | --- | --- |
 | Cheap Candidate Trigger | Quickly detect that something might have happened | YOLO labels, person/ROI overlap, object signature change, scene-change-ready schema |
-| Fast Semantic Verifier | Decide whether a candidate matches the user's event rule | FINAL_ANSWER protocol; mock workflow now, SmolVLM2 candidate from benchmark |
+| Fast Semantic Verifier | Decide whether a candidate matches the user's event rule | RTX SmolVLM2-256M service with FINAL_ANSWER protocol; mock remains available offline |
 | Slow Semantic Describer | Add natural-language descriptions for confirmed/high-value events | Gemma remote VLM async path |
 | Daily Summary | Summarize structured event records, not video | deterministic summary plus optional Qwen text LLM narrative |
 
@@ -63,7 +63,7 @@ YOLO TensorRT remains valuable because it is fast and local, but it is only a ch
 | Area | Result |
 | --- | --- |
 | Cheap trigger path | YOLOv8n TensorRT FP16 averages about 14.54 ms inference on Jetson benchmark evidence. |
-| Fast verifier candidate | SmolVLM2 runs sub-second on RTX in benchmark evidence; FINAL_ANSWER yes/no is the intended protocol. |
+| Fast verifier | SmolVLM2-256M is connected as an RTX FINAL_ANSWER verifier; validation passed YES / NO / UNKNOWN and graceful fallback cases. |
 | Slow describer | Gemma 4 E2B-it Q4 + mmproj is real, not mock, and is reserved for async event descriptions. |
 | Text summary backend | Qwen text LLMs handle daily summary and search assistant roles. |
 | Camera integration | CSI IMX219 + GStreamer Argus capture is validated. Snapshot capture can be around 1s; YOLO inference is much faster. |
@@ -105,7 +105,7 @@ EdgeLog validation artifacts:
 - [serving/results/raw/edgelog_v1_validation.csv](serving/results/raw/edgelog_v1_validation.csv)
 - [serving/results/raw/semantic_event_memory_validation.csv](serving/results/raw/semantic_event_memory_validation.csv)
 
-Validation covers proposal creation, verifier YES/NO/UNKNOWN/failure, duplicate proposal suppression, search, daily summary exclusion of rejected candidates, retention, and system status expectations. Some tests use a mock verifier because SmolVLM2 service integration is a next step; prior benchmarks provide the latency/protocol evidence.
+Validation covers proposal creation, verifier YES/NO/UNKNOWN/failure, duplicate proposal suppression, search, daily summary exclusion of rejected candidates, retention, and system status expectations. The live SmolVLM2 verifier validation is tracked separately in `docs/smolvlm2_fast_verifier_integration.md`.
 
 ## Documentation Map
 
@@ -113,6 +113,7 @@ Product docs:
 
 - [docs/semantic_event_memory_design.md](docs/semantic_event_memory_design.md)
 - [docs/semantic_event_memory_validation.md](docs/semantic_event_memory_validation.md)
+- [docs/smolvlm2_fast_verifier_integration.md](docs/smolvlm2_fast_verifier_integration.md)
 - [docs/edgelog_product_spec.md](docs/edgelog_product_spec.md)
 - [docs/edgelog_v1_validation.md](docs/edgelog_v1_validation.md)
 - [demo/README.md](demo/README.md)
@@ -148,7 +149,7 @@ These are intentionally not committed:
 
 - Prototype, not production serving.
 - Single camera and fixed scene only.
-- Fast VLM verification is currently a mock workflow plus SmolVLM2 benchmark evidence, not a default live service.
+- Fast VLM verification requires the RTX SmolVLM2 service on `127.0.0.1:8092`; mock mode remains available for offline demos.
 - Gemma VLM is asynchronous and slow; it is not a real-time detector.
 - Event clips are schema-ready via `clip_path`, but v1 keeps keyframes as the stable path.
 - Search is local JSONL keyword/filter search, not SQLite FTS5 or embeddings yet.
@@ -156,7 +157,7 @@ These are intentionally not committed:
 
 ## Next Steps
 
-- Connect a live SmolVLM2 final-line verifier service on RTX.
+- Broaden SmolVLM2 verifier validation to more user-defined event rules.
 - Lightweight clip ring buffer with pre/post event seconds.
 - SQLite FTS5 search, then optional embedding/FAISS retrieval.
 - Persistent remote VLM server to reduce subprocess latency.
