@@ -2,10 +2,10 @@
 
 ## Scope
 
-This validation checks the EdgeLog v1 product loop:
+This validation checks the earlier EdgeLog v1 state/search/retention loop. The product direction has since been sharpened to semantic event memory; see `docs/semantic_event_memory_validation.md` for proposal/verifier validation.
 
 ```text
-Jetson local detection -> event state -> retained event -> search -> daily summary -> async semantic status update
+cheap trigger -> proposal/event state -> retained event -> search -> daily summary -> async semantic status update
 ```
 
 The validation is intentionally lightweight. It does not start new models and does not write runtime camera images into git.

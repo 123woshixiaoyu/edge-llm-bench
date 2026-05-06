@@ -19,6 +19,8 @@ LATEST_SNAPSHOT_PATH = EVENT_ROOT / "latest_snapshot.jpg"
 STORAGE_POLICY_VERSION = "2026-05-retention-v1"
 EDGELOG_SCHEMA_VERSION = "edgelog-v1"
 EDGELOG_EVENT_TYPES = {
+    "semantic_event",
+    "unknown",
     "person_enter_exit",
     "roi_intrusion",
     "object_change",
@@ -262,6 +264,9 @@ def _normalize_event_schema(
         or event.get("full_response")
         or ""
     )
+    proposal = event.get("proposal") if isinstance(event.get("proposal"), dict) else {}
+    verification = event.get("verification") if isinstance(event.get("verification"), dict) else {}
+    description = event.get("description") if isinstance(event.get("description"), dict) else {}
     total_latency = event.get("latency_ms")
     if total_latency in {None, ""}:
         total_latency = event.get("total_latency_ms")
@@ -279,6 +284,38 @@ def _normalize_event_schema(
         "risk_level": event.get("risk_level") or _infer_risk_level(event),
         "semantic_status": semantic_status,
         "semantic_description": semantic_description,
+        "proposal": {
+            "proposal_id": proposal.get("proposal_id") or event.get("proposal_id"),
+            "trigger_type": proposal.get("trigger_type") or event.get("trigger_type"),
+            "proposal_reason": proposal.get("proposal_reason")
+            or event.get("proposal_reason")
+            or "; ".join(str(reason) for reason in event.get("reasons", []) if reason),
+            "objects": proposal.get("objects") or objects,
+            "roi_name": proposal.get("roi_name") or event.get("roi_name"),
+            "confidence": proposal.get("confidence") or event.get("confidence"),
+            "keyframe_path": proposal.get("keyframe_path") or image_path or event.get("keyframe_path"),
+            "clip_path": proposal.get("clip_path") or event.get("clip_path"),
+        },
+        "verification": {
+            "verifier_backend": verification.get("verifier_backend") or event.get("verifier_backend") or "",
+            "semantic_status": verification.get("semantic_status") or semantic_status,
+            "final_answer": verification.get("final_answer") or event.get("final_answer") or "",
+            "reason": verification.get("reason") or event.get("verification_reason") or "",
+            "latency_ms": _safe_float(verification.get("latency_ms") or event.get("verification_latency_ms"), default=None),
+        },
+        "description": {
+            "describer_backend": description.get("describer_backend") or event.get("describer_backend") or "",
+            "semantic_description": description.get("semantic_description") or semantic_description,
+            "risk_level": description.get("risk_level") or event.get("risk_level") or _infer_risk_level(event),
+            "latency_ms": _safe_float(description.get("latency_ms") or event.get("description_latency_ms"), default=None),
+        },
+        "storage": {
+            "keyframe_path": event.get("keyframe_path") or image_path or event.get("image_path"),
+            "clip_path": event.get("clip_path"),
+            "stored_image": bool(event.get("stored_image") or image_path),
+            "sent_to_remote": sent_to_remote,
+            "retention_expires_at": event.get("retention_expires_at") or _retention_expires_at(timestamp, policy),
+        },
         "keyframe_path": event.get("keyframe_path") or image_path or event.get("image_path"),
         "clip_path": event.get("clip_path"),
         "backend": event.get("backend") or event.get("selected_backend") or event.get("local_cv_backend") or "",
@@ -507,6 +544,9 @@ def search_events(
             [
                 str(record.get("event_type", "")),
                 " ".join(str(item) for item in record.get("objects", []) if item),
+                str((record.get("proposal") or {}).get("proposal_reason", "")),
+                str((record.get("verification") or {}).get("reason", "")),
+                str((record.get("verification") or {}).get("final_answer", "")),
                 str(record.get("semantic_description", "")),
                 str(record.get("final_answer_text", "")),
                 str(record.get("roi_name", "")),
@@ -535,6 +575,8 @@ def build_daily_summary(date_prefix: str | None = None) -> dict[str, Any]:
     timeline: list[str] = []
     for record in records:
         event_type = str(record.get("event_type") or "unknown")
+        if record.get("status") == "rejected" or (record.get("verification") or {}).get("final_answer") == "NO":
+            continue
         by_type[event_type] = by_type.get(event_type, 0) + 1
         if record.get("risk_level") == "high":
             high_risk.append(record)

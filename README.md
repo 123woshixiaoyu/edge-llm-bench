@@ -1,65 +1,72 @@
 # EdgeLog
 
-**Local-first video event memory box for semantic search and daily summaries.**
+**Local-first semantic event memory for video.**
 
-EdgeLog turns a fixed camera stream into searchable, summarizable local event memory. Jetson runs the real-time path: camera snapshot, YOLO TensorRT detection, simple event state, keyframe retention. RTX backends run the async semantic path: event review, semantic descriptions, and daily summaries only after an event exists and privacy allows offload.
+EdgeLog does not save all-day video and does not treat object detections as the product result. It uses cheap local visual signals to propose candidate events, uses a fast VLM-style verifier to decide whether a candidate matches a user-defined semantic rule, then stores searchable event memory and daily summaries.
 
-In Chinese: EdgeLog 把固定摄像头的视频流转化为可搜索、可总结的本地事件记忆：Jetson 负责实时检测和事件切片，RTX 负责异步语义理解和日报生成，用户可以用自然语言检索历史事件，而不需要人工翻看长视频。
+Plain-language summary: EdgeLog turns a fixed camera feed into searchable semantic event memory. Jetson proposes candidate events locally. A VLM verifies whether those candidates are events the user cares about. Stronger VLM/LLM backends add descriptions and summaries later, so the user does not need to scrub through long video.
 
-EdgeLog is not a generic AI gateway demo and not a full security platform. The gateway is infrastructure. The product is the event memory loop:
+The gateway is infrastructure. The product loop is:
 
 ```text
-camera frame -> Jetson YOLO/rules -> event + keyframe -> async RTX semantics -> search + daily summary
+cheap trigger -> event proposal -> fast VLM verifier -> semantic event -> slow description/search/daily summary
 ```
 
 ## Architecture
 
 ```mermaid
 flowchart TD
-    A["Fixed camera"] --> B["Jetson EdgeLog runtime"]
-    B --> C["YOLOv8n TensorRT FP16"]
-    C --> D["Event state machine"]
-    D -->|person_enter_exit| E["Local event memory"]
-    D -->|roi_intrusion| E
-    D -->|object_change| E
-    D -->|loitering| E
-    E --> F["JSONL history + keyframes + retention"]
-    F --> G["Event Search"]
-    F --> H["Daily Summary"]
-    E -->|privacy allows async review| I["RTX remote VLM\nGemma 4 E2B-it + mmproj"]
-    I --> J["semantic_status completed/failed"]
-    J --> F
-    H -->|optional text summary| K["Local/remote Qwen text LLM"]
-    B -->|privacy conflict / backend unavailable| L["reject / metadata-only event"]
+    A["Fixed camera"] --> B["Cheap candidate trigger: motion, ROI, YOLO, scene change"]
+    B --> C["event_proposal"]
+    C --> D["Fast semantic verifier: FINAL_ANSWER YES / NO / UNKNOWN"]
+    D -->|YES| E["Verified semantic event"]
+    D -->|NO| F["Rejected candidate"]
+    D -->|UNKNOWN / failed| G["Needs review / failed"]
+    E --> H["Local JSONL event memory + keyframe retention"]
+    G --> H
+    H --> I["Slow semantic describer: Gemma VLM async"]
+    I --> J["semantic_description"]
+    J --> H
+    H --> K["Event Search"]
+    H --> L["Daily Summary via deterministic logic or Qwen text LLM"]
+    C -->|privacy conflict| M["reject / metadata-only event"]
 ```
 
 ## EdgeLog v1 MVP
 
-Single camera, fixed scene, local-first event memory:
+Single camera, fixed scene, semantic event memory:
 
-| Event type | v1 trigger | Notes |
+| Layer | Responsibility | Current implementation |
 | --- | --- | --- |
-| `person_enter_exit` | YOLO `person` appears or disappears | Uses state, not per-frame spam. |
-| `roi_intrusion` | `person` enters a configured ROI | Records ROI name and triggering object. |
-| `object_change` | ROI object signature changes | MVP uses keyframe difference + YOLO labels + simple rules. |
-| `loitering` | `person` remains in ROI beyond threshold | Default threshold is configurable, e.g. 10 seconds. |
+| Cheap Candidate Trigger | Quickly detect that something might have happened | YOLO labels, person/ROI overlap, object signature change, scene-change-ready schema |
+| Fast Semantic Verifier | Decide whether a candidate matches the user's event rule | FINAL_ANSWER protocol; mock workflow now, SmolVLM2 candidate from benchmark |
+| Slow Semantic Describer | Add natural-language descriptions for confirmed/high-value events | Gemma remote VLM async path |
+| Daily Summary | Summarize structured event records, not video | deterministic summary plus optional Qwen text LLM narrative |
 
-Not in v1: face recognition, identity ("who"), multi-camera, real-time VLM, complex behavior recognition, cloud upload, or production-scale video management.
+Not in v1: face recognition, identity ("who"), multi-camera, real-time VLM, complex behavior recognition, cloud upload, or production video management.
 
-## Why Event Memory Instead Of All-Day Recording?
+## Why Not An Object Detection Log?
 
-All-day video is expensive to review and hard to search. EdgeLog keeps ordinary frames ephemeral, retains only meaningful events, and stores structured metadata plus keyframes. Remote semantic review is asynchronous because the Gemma VLM path can take roughly 15-30 seconds; that is acceptable for event annotation, but not for real-time triggering.
+Users do not review video because they care that a detector saw `chair` or `bottle`. They care whether something meaningful happened:
+
+- someone entered a restricted zone;
+- someone approached a dangerous area;
+- equipment was removed from a desk;
+- a cabinet or door was left open;
+- someone lingered too long;
+- today's events need review.
+
+YOLO TensorRT remains valuable because it is fast and local, but it is only a cheap trigger. VLM verification is the semantic decision layer.
 
 ## Key Technical Results
 
 | Area | Result |
 | --- | --- |
-| Jetson text backend | Qwen3.5 0.8B Q4_K_M selected as local default from quantization scorecard. |
-| RTX text fallback | Qwen3.5 4B Q4_K_M handles heavier summaries/reasoning. |
-| Local CV fast path | YOLOv8n TensorRT FP16 averages about 14.54 ms inference on Jetson benchmark evidence. |
+| Cheap trigger path | YOLOv8n TensorRT FP16 averages about 14.54 ms inference on Jetson benchmark evidence. |
+| Fast verifier candidate | SmolVLM2 runs sub-second on RTX in benchmark evidence; FINAL_ANSWER yes/no is the intended protocol. |
+| Slow describer | Gemma 4 E2B-it Q4 + mmproj is real, not mock, and is reserved for async event descriptions. |
+| Text summary backend | Qwen text LLMs handle daily summary and search assistant roles. |
 | Camera integration | CSI IMX219 + GStreamer Argus capture is validated. Snapshot capture can be around 1s; YOLO inference is much faster. |
-| Remote VLM | Gemma 4 E2B-it Q4 + mmproj is real, not mock, and is used only for async semantic event review. |
-| Reliability | v0.7 minimal benchmark covers queue/fallback/reject/backend unavailable/timeout behavior. |
 | Retention | `runtime_data/` stores bounded JSONL history and event images; ordinary frames are not retained forever. |
 
 ## Demo
@@ -80,26 +87,32 @@ EDGE_GATEWAY_URL=http://custom-jetson:8000 streamlit run demo/app.py
 
 Main pages:
 
-- **Live Event Stream**: capture once or start a snapshot loop; Jetson YOLO/rules create events.
-- **Event Search**: local keyword/filter search over event type, objects, ROI, risk, and semantic description.
-- **Daily Summary**: deterministic event counts/timeline, with optional LLM narrative summary.
+- **Live Event Stream**: cheap triggers create proposals and the verifier promotes, rejects, or marks them unknown.
+- **Event Rules**: define the user-facing semantic rule and verifier backend.
+- **Event Search**: search verified/unknown/rejected semantic events.
+- **Daily Summary**: summarize structured event records and completed descriptions.
 - **System Status**: Jetson Gateway, local CV/LLM, RTX LLM/VLM readiness.
-- **Model / Routing Policy**: why Jetson is the fast path and RTX is the async semantic path.
+- **Model / Routing Policy**: why YOLO is a trigger, SmolVLM2 is a verifier candidate, Gemma is a slow describer, and Qwen is a summary assistant.
 
 ## Validation
 
-EdgeLog v1 validation artifacts:
+EdgeLog validation artifacts:
 
 - [docs/edgelog_product_spec.md](docs/edgelog_product_spec.md)
 - [docs/edgelog_v1_validation.md](docs/edgelog_v1_validation.md)
+- [docs/semantic_event_memory_design.md](docs/semantic_event_memory_design.md)
+- [docs/semantic_event_memory_validation.md](docs/semantic_event_memory_validation.md)
 - [serving/results/raw/edgelog_v1_validation.csv](serving/results/raw/edgelog_v1_validation.csv)
+- [serving/results/raw/semantic_event_memory_validation.csv](serving/results/raw/semantic_event_memory_validation.csv)
 
-Validation covers person enter, ROI intrusion, object change, loitering, cooldown de-duplication, search, daily summary, async semantic status update, retention, and system status expectations. Some event-state tests are simulated because they validate state-machine behavior rather than production video.
+Validation covers proposal creation, verifier YES/NO/UNKNOWN/failure, duplicate proposal suppression, search, daily summary exclusion of rejected candidates, retention, and system status expectations. Some tests use a mock verifier because SmolVLM2 service integration is a next step; prior benchmarks provide the latency/protocol evidence.
 
 ## Documentation Map
 
 Product docs:
 
+- [docs/semantic_event_memory_design.md](docs/semantic_event_memory_design.md)
+- [docs/semantic_event_memory_validation.md](docs/semantic_event_memory_validation.md)
 - [docs/edgelog_product_spec.md](docs/edgelog_product_spec.md)
 - [docs/edgelog_v1_validation.md](docs/edgelog_v1_validation.md)
 - [demo/README.md](demo/README.md)
@@ -112,10 +125,10 @@ Technical appendix:
 - [docs/model_selection_scorecard.md](docs/model_selection_scorecard.md)
 - [serving/docs/project3_tensorrt_report.md](serving/docs/project3_tensorrt_report.md)
 - [serving/docs/reliability_report.md](serving/docs/reliability_report.md)
-- [serving/docs/remote_vlm_latency_optimization.md](serving/docs/remote_vlm_latency_optimization.md)
 - [serving/docs/fast_vlm_verifier_benchmark.md](serving/docs/fast_vlm_verifier_benchmark.md)
 - [serving/docs/vlm_output_robustness.md](serving/docs/vlm_output_robustness.md)
 - [serving/docs/yolo_world_trigger_benchmark.md](serving/docs/yolo_world_trigger_benchmark.md)
+- [serving/docs/remote_vlm_latency_optimization.md](serving/docs/remote_vlm_latency_optimization.md)
 - [serving/docs/serving_design.md](serving/docs/serving_design.md)
 - [serving/docs/routing_policy.md](serving/docs/routing_policy.md)
 
@@ -135,15 +148,16 @@ These are intentionally not committed:
 
 - Prototype, not production serving.
 - Single camera and fixed scene only.
-- Event clips are schema-ready via `clip_path`, but v1 keeps keyframes as the stable path; clip ring buffer is a next step.
+- Fast VLM verification is currently a mock workflow plus SmolVLM2 benchmark evidence, not a default live service.
+- Gemma VLM is asynchronous and slow; it is not a real-time detector.
+- Event clips are schema-ready via `clip_path`, but v1 keeps keyframes as the stable path.
 - Search is local JSONL keyword/filter search, not SQLite FTS5 or embeddings yet.
-- Remote VLM is asynchronous and slow; it is not a real-time detector.
 - No face recognition, identity tracking, cloud upload, Kubernetes, autoscaling, or production observability stack.
 
 ## Next Steps
 
+- Connect a live SmolVLM2 final-line verifier service on RTX.
 - Lightweight clip ring buffer with pre/post event seconds.
 - SQLite FTS5 search, then optional embedding/FAISS retrieval.
 - Persistent remote VLM server to reduce subprocess latency.
 - Optional YOLO-World custom-object trigger path after controlled Jetson runtime validation.
-- Recorded walkthrough and submission packaging.

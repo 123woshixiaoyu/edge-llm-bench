@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import math
 import time
+import uuid
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any
@@ -159,18 +160,58 @@ class EdgeLogEventEngine:
         duration_s: float | None = None,
     ) -> dict[str, Any]:
         timestamp = _now_iso(now_s)
+        proposal_id = uuid.uuid4().hex[:12]
+        trigger_type_map = {
+            "person_enter_exit": "person",
+            "roi_intrusion": "roi_overlap",
+            "object_change": "object_change",
+            "loitering": "person",
+        }
+        proposal = {
+            "proposal_id": proposal_id,
+            "trigger_type": trigger_type_map.get(event_type, "scene_change"),
+            "timestamp": timestamp,
+            "roi_name": roi_name,
+            "objects": objects,
+            "keyframe_path": None,
+            "clip_path": None,
+            "confidence": confidence,
+            "proposal_reason": reason,
+        }
         return {
+            "event_rule": "",
             "event_type": event_type,
             "start_time": start_time or timestamp,
             "end_time": timestamp if status == "ended" else None,
             "duration_s": round(float(duration_s or 0.0), 2),
-            "status": status,
+            "status": "proposed",
             "objects": objects,
             "roi_name": roi_name,
             "confidence": confidence,
             "risk_level": risk_level,
-            "semantic_status": "not_required",
+            "semantic_status": "pending",
             "semantic_description": "",
+            "proposal": proposal,
+            "verification": {
+                "verifier_backend": "",
+                "semantic_status": "pending",
+                "final_answer": "",
+                "reason": "",
+                "latency_ms": None,
+            },
+            "description": {
+                "describer_backend": "",
+                "semantic_description": "",
+                "risk_level": risk_level,
+                "latency_ms": None,
+            },
+            "storage": {
+                "keyframe_path": None,
+                "clip_path": None,
+                "stored_image": False,
+                "sent_to_remote": False,
+                "retention_expires_at": None,
+            },
             "keyframe_path": None,
             "clip_path": None,
             "route": "local",

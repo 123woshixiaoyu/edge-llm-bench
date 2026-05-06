@@ -23,6 +23,7 @@ from event_store import (
 )
 from monitoring_rules import MonitoringRule, detection_signature, evaluate_rule
 from output_validation import structured_vlm_prompt
+from semantic_event_rules import default_semantic_event_rule, rule_from_config
 from sample_results import (
     SAMPLE_IMAGE,
     backend_status,
@@ -33,6 +34,7 @@ from sample_results import (
     select_text_sample,
     select_vision_sample,
 )
+from vlm_verifier import MockSemanticVerifier, verification_to_dict
 
 
 st.set_page_config(
@@ -81,6 +83,12 @@ def ensure_edgelog_engine() -> EdgeLogEventEngine:
     if "edgelog_event_engine" not in st.session_state:
         st.session_state["edgelog_event_engine"] = EdgeLogEventEngine()
     return st.session_state["edgelog_event_engine"]
+
+
+def ensure_semantic_event_rule_config() -> dict[str, Any]:
+    if "semantic_event_rule_config" not in st.session_state:
+        st.session_state["semantic_event_rule_config"] = default_semantic_event_rule()
+    return st.session_state["semantic_event_rule_config"]
 
 
 def sync_rule_widgets_from_config(config: dict[str, Any]) -> None:
@@ -145,6 +153,18 @@ def _event_from_result(
 ) -> dict[str, Any]:
     return {
         "event_type": result.get("event_type"),
+        "event_rule": result.get("event_rule"),
+        "proposal": result.get("proposal"),
+        "verification": result.get("verification"),
+        "description": result.get("description"),
+        "storage": result.get("storage"),
+        "proposal_id": result.get("proposal_id"),
+        "trigger_type": result.get("trigger_type"),
+        "proposal_reason": result.get("proposal_reason"),
+        "verifier_backend": result.get("verifier_backend"),
+        "final_answer": result.get("final_answer"),
+        "verification_reason": result.get("verification_reason"),
+        "verification_latency_ms": result.get("verification_latency_ms"),
         "start_time": result.get("start_time"),
         "end_time": result.get("end_time"),
         "duration_s": result.get("duration_s"),
@@ -505,37 +525,103 @@ def _run_live_monitor_capture(
     if result.get("mode") == "sample fallback":
         st.warning("Real backend unavailable; showing committed sample fallback.")
 
+    semantic_rule = rule_from_config(ensure_semantic_event_rule_config())
     if primary_edge_event:
         result.update(primary_edge_event)
-        st.warning(f"EdgeLog event: {primary_edge_event['event_type']} in {primary_edge_event.get('roi_name') or 'scene'}.")
+        result["event_rule"] = semantic_rule.natural_language_rule
+        result["proposal_id"] = primary_edge_event.get("proposal", {}).get("proposal_id")
+        result["trigger_type"] = primary_edge_event.get("proposal", {}).get("trigger_type")
+        result["proposal_reason"] = primary_edge_event.get("proposal", {}).get("proposal_reason")
+        st.warning(
+            f"Candidate proposal: {primary_edge_event['event_type']} in "
+            f"{primary_edge_event.get('roi_name') or 'scene'}."
+        )
     elif rule_result["trigger_matched"]:
         result.update(
             {
+                "event_rule": semantic_rule.natural_language_rule,
                 "event_type": "object_change",
+                "proposal": {
+                    "proposal_id": f"rule-{frame_id}",
+                    "trigger_type": "yolo_label",
+                    "timestamp": None,
+                    "proposal_reason": f"YOLO label matched rule: {watch_label}",
+                    "objects": [label.strip() for label in watch_label.split(",") if label.strip()],
+                    "roi_name": roi_name,
+                    "confidence": max(
+                        [float(match.get("confidence") or 0.0) for match in rule_result.get("matches", [])] or [0.0]
+                    ),
+                    "keyframe_path": None,
+                    "clip_path": None,
+                },
                 "start_time": None,
                 "end_time": None,
                 "duration_s": 0.0,
-                "status": "ended",
+                "status": "proposed",
                 "objects": [label.strip() for label in watch_label.split(",") if label.strip()],
                 "roi_name": roi_name,
                 "confidence": max(
                     [float(match.get("confidence") or 0.0) for match in rule_result.get("matches", [])] or [0.0]
                 ),
                 "risk_level": "medium",
-                "semantic_status": "not_required",
+                "semantic_status": "pending",
                 "semantic_description": "",
                 "clip_path": None,
                 "backend": "yolov8n_tensorrt_fp16",
                 "latency_ms": _as_float(result.get("total_latency_ms")),
             }
         )
-        st.warning("Candidate Event: trigger matched local detection rule.")
+        result["proposal_id"] = result["proposal"]["proposal_id"]
+        result["trigger_type"] = result["proposal"]["trigger_type"]
+        result["proposal_reason"] = result["proposal"]["proposal_reason"]
+        st.warning("Candidate proposal: cheap YOLO label trigger matched.")
     if result["trigger_matched"]:
-        if require_vlm_confirmation and rule_privacy == "allow_remote":
+        proposal = result.get("proposal") or {}
+        verification_result = verification_to_dict(
+            MockSemanticVerifier().verify(
+                {
+                    "natural_language_rule": semantic_rule.natural_language_rule,
+                    "rule_name": semantic_rule.rule_name,
+                },
+                proposal,
+            )
+        )
+        result["verification"] = verification_result
+        result["verifier_backend"] = verification_result["verifier_backend"]
+        result["final_answer"] = verification_result["final_answer"]
+        result["verification_reason"] = verification_result["reason"]
+        result["verification_latency_ms"] = verification_result["latency_ms"]
+        result["semantic_status"] = verification_result["semantic_status"]
+        if verification_result.get("error"):
+            result["status"] = "failed"
+            result["risk_level"] = "medium"
+        elif verification_result["final_answer"] == "YES":
+            result["status"] = "verified"
+            result["event_type"] = "semantic_event"
+            result["risk_level"] = semantic_rule.risk_level_if_verified
+            result["description"] = {
+                "describer_backend": "",
+                "semantic_description": "",
+                "risk_level": semantic_rule.risk_level_if_verified,
+                "latency_ms": None,
+            }
+        elif verification_result["final_answer"] == "NO":
+            result["status"] = "rejected"
+            result["risk_level"] = "low"
+        elif verification_result["final_answer"] == "UNKNOWN":
+            result["status"] = "unknown"
+            result["risk_level"] = "medium"
+        else:
+            result["status"] = "failed"
+            result["risk_level"] = "medium"
+        if (
+            require_vlm_confirmation
+            and rule_privacy == "allow_remote"
+            and verification_result["final_answer"] == "YES"
+        ):
             result["vlm_review_status"] = "queued"
-            result["semantic_status"] = "pending"
             result["sent_to_remote"] = True
-            result["final_answer_text"] = "Candidate event queued for workstation VLM review."
+            result["final_answer_text"] = "Verified semantic event queued for slow workstation description."
         elif require_vlm_confirmation and rule_privacy == "local_only":
             result["vlm_review_status"] = "failed"
             result["event_type"] = "privacy_reject"
@@ -551,10 +637,11 @@ def _run_live_monitor_capture(
                 *result.get("reasons", []),
             ]
         else:
-            result["alert"] = True
-            result["semantic_status"] = result.get("semantic_status") or "not_required"
+            result["alert"] = verification_result["final_answer"] == "YES"
             result["sent_to_remote"] = False
-            result["final_answer_text"] = "Local alert generated from YOLO TensorRT detection rule."
+            result["final_answer_text"] = (
+                f"Verifier {verification_result['final_answer']}: {verification_result['reason']}"
+            )
     else:
         result["sent_to_remote"] = False
         st.caption(f"No candidate event triggered: {rule_result['reason']}")
@@ -574,7 +661,12 @@ def _run_live_monitor_capture(
     st.session_state["last_live_monitor_result"] = result
     st.session_state["last_monitor_refresh_at"] = time.monotonic()
 
-    if rule_result["trigger_matched"] and require_vlm_confirmation and rule_privacy == "allow_remote":
+    if (
+        result.get("trigger_matched")
+        and require_vlm_confirmation
+        and rule_privacy == "allow_remote"
+        and result.get("final_answer") == "YES"
+    ):
         if event.get("image_path"):
             review_queue = _ensure_review_worker(api_base_url)
             review_queue.put(
@@ -604,10 +696,12 @@ def _run_live_monitor_capture(
 def render_live_monitor(use_sample_mode: bool, api_base_url: str) -> None:
     st.subheader("Live Event Stream")
     st.write("Turn camera snapshots into local EdgeLog events with Jetson YOLO TensorRT and simple state rules.")
+    semantic_rule = rule_from_config(ensure_semantic_event_rule_config())
     st.caption(
-        "Auto refresh updates the latest snapshot only. Long-term history stores alerts, triggered events, "
-        "reviews, rejects, errors/fallbacks, assistant summaries, and user-saved snapshots."
+        "Auto refresh updates the latest snapshot only. Cheap triggers create candidate proposals; "
+        "the semantic verifier promotes them to YES / NO / UNKNOWN events."
     )
+    st.info(f"Active semantic rule: {semantic_rule.rule_name} — {semantic_rule.natural_language_rule}")
     if "vlm_review_queue" in st.session_state:
         st.caption(f"VLM review pending: {st.session_state['vlm_review_queue'].qsize()}")
 
@@ -785,8 +879,10 @@ def render_live_monitor(use_sample_mode: bool, api_base_url: str) -> None:
                     "time": event.get("start_time") or event.get("timestamp"),
                     "event_type": event.get("event_type"),
                     "status": event.get("status"),
+                    "verifier_answer": (event.get("verification") or {}).get("final_answer"),
                     "risk": event.get("risk_level"),
                     "semantic": event.get("semantic_status"),
+                    "proposal": (event.get("proposal") or {}).get("proposal_reason"),
                     "objects": ", ".join(str(item) for item in event.get("objects", [])),
                 }
                 for event in recent_events
@@ -1057,7 +1153,7 @@ def render_event_history() -> None:
 
 def render_event_search() -> None:
     st.subheader("Event Search")
-    st.write("Search retained EdgeLog events by type, object labels, ROI, risk, and semantic description.")
+    st.write("Search semantic events by rule, verifier answer, ROI, risk, and description.")
     left, right = st.columns([2, 1])
     with left:
         query = st.text_input("Search events", placeholder="person, watch_zone, completed description...")
@@ -1066,10 +1162,12 @@ def render_event_search() -> None:
             "Event type",
             [
                 "all",
+                "semantic_event",
                 "person_enter_exit",
                 "roi_intrusion",
                 "object_change",
                 "loitering",
+                "unknown",
                 "assistant_summary",
                 "privacy_reject",
                 "backend_error",
@@ -1078,7 +1176,7 @@ def render_event_search() -> None:
         risk_level = st.selectbox("Risk", ["all", "low", "medium", "high"])
         semantic_status = st.selectbox(
             "Semantic status",
-            ["all", "not_required", "pending", "completed", "failed"],
+            ["yes", "all", "pending", "no", "unknown", "completed", "failed", "not_required"],
         )
     results = search_events(
         query,
@@ -1088,7 +1186,8 @@ def render_event_search() -> None:
         limit=50,
     )
     st.caption(
-        "MVP search uses local JSONL keyword/filter matching. It can be upgraded later to SQLite FTS5, embeddings, or FAISS."
+        "Default view prioritizes verified semantic events. MVP search uses local JSONL keyword/filter matching; "
+        "it can be upgraded later to SQLite FTS5, embeddings, or FAISS."
     )
     if not results:
         st.info("No matching events found.")
@@ -1100,8 +1199,10 @@ def render_event_search() -> None:
                 "event_type": event.get("event_type"),
                 "risk": event.get("risk_level"),
                 "semantic_status": event.get("semantic_status"),
+                "verifier": (event.get("verification") or {}).get("final_answer"),
                 "objects": ", ".join(str(item) for item in event.get("objects", [])),
                 "roi": event.get("roi_name"),
+                "rule": event.get("event_rule"),
                 "description": event.get("semantic_description") or event.get("final_answer_text"),
             }
             for event in results
@@ -1117,6 +1218,81 @@ def render_event_search() -> None:
                 st.image(image_path, caption="Event keyframe", use_container_width=True)
             st.write(event.get("semantic_description") or event.get("final_answer_text") or "No semantic description yet.")
             st.json(event)
+
+
+def render_event_rules() -> None:
+    st.subheader("Event Rules")
+    st.write(
+        "Define what counts as a semantic event. Cheap triggers only propose candidates; "
+        "the verifier decides YES / NO / UNKNOWN."
+    )
+    current = ensure_semantic_event_rule_config()
+    if st.session_state.pop("semantic_rule_saved", False):
+        st.success("Semantic event rule saved.")
+    with st.form("semantic_event_rule_form"):
+        rule_name = st.text_input("Rule name", value=current["rule_name"])
+        natural_language_rule = st.text_area(
+            "Natural language rule",
+            value=current["natural_language_rule"],
+            height=100,
+        )
+        cols = st.columns(3)
+        roi_name = cols[0].text_input("ROI name", value=current["roi_name"])
+        privacy_mode = cols[1].selectbox(
+            "Privacy mode",
+            ["allow_remote", "local_only"],
+            index=["allow_remote", "local_only"].index(current["privacy_mode"]),
+        )
+        verifier_backend = cols[2].selectbox(
+            "Verifier backend",
+            ["mock_final_line", "smolvlm2_fast_candidate", "gemma_vlm"],
+            index=0
+            if current["verifier_backend"] not in {"smolvlm2_fast_candidate", "gemma_vlm"}
+            else ["mock_final_line", "smolvlm2_fast_candidate", "gemma_vlm"].index(current["verifier_backend"]),
+        )
+        cols2 = st.columns(2)
+        min_trigger_interval_s = cols2[0].number_input(
+            "Minimum trigger interval seconds",
+            min_value=0,
+            max_value=600,
+            value=int(current["min_trigger_interval_s"]),
+            step=1,
+        )
+        risk_level_if_verified = cols2[1].selectbox(
+            "Risk if verified",
+            ["low", "medium", "high"],
+            index=["low", "medium", "high"].index(current["risk_level_if_verified"]),
+        )
+        submitted = st.form_submit_button("Save Event Rule", type="primary")
+    if submitted:
+        st.session_state["semantic_event_rule_config"] = {
+            "rule_name": rule_name,
+            "natural_language_rule": natural_language_rule,
+            "roi_name": roi_name,
+            "privacy_mode": privacy_mode,
+            "verifier_backend": verifier_backend,
+            "min_trigger_interval_s": float(min_trigger_interval_s),
+            "risk_level_if_verified": risk_level_if_verified,
+        }
+        st.session_state["semantic_rule_saved"] = True
+        ensure_edgelog_engine().reset()
+        st.rerun()
+    st.info(
+        "SmolVLM2 is a fast verifier candidate based on the benchmark, but it is not a default service integration here. "
+        "This workflow uses mock FINAL_ANSWER validation unless a verifier service is connected later."
+    )
+    st.markdown(
+        """
+Verifier protocol:
+
+```text
+FINAL_ANSWER: YES
+REASON: short reason
+```
+
+Allowed answers are `YES`, `NO`, and `UNKNOWN`. Strict JSON is intentionally avoided for SmolVLM2-style fast verification.
+"""
+    )
 
 
 def render_daily_summary(use_sample_mode: bool, api_base_url: str) -> None:
@@ -1226,16 +1402,18 @@ def render_model_policy() -> None:
         """
 | Role | Default backend | Product meaning |
 | --- | --- | --- |
-| Jetson local CV | YOLOv8n TensorRT FP16 | Real-time event trigger path for person enter/exit, ROI intrusion, object change, and loitering. |
-| Jetson text default | Qwen3.5 0.8B Q4 | Local assistant responses when a summary/policy question should stay on the device. |
-| RTX text fallback | Qwen3.5 4B Q4 | Heavier daily summaries and high-quality text review. |
-| RTX semantic vision | Gemma 4 E2B-it Q4 + mmproj | Asynchronous event-level semantic descriptions after an event is already saved. |
+| Cheap candidate trigger | YOLOv8n TensorRT FP16 / ROI / change rules | Proposes that something may have happened; not final event understanding. |
+| Fast semantic verifier | SmolVLM2 final-line candidate / mock workflow | Answers YES / NO / UNKNOWN for user-defined event rules. |
+| Slow semantic describer | Gemma 4 E2B-it Q4 + mmproj | Asynchronous descriptions for verified or high-value events. |
+| Daily summary assistant | Qwen text LLM local/remote | Summarizes structured event tables, not video frames. |
 | MobileNet-SSD | OpenCV DNN baseline | v0.5 system integration baseline and fallback reference. |
 """
     )
     st.markdown(
         """
-- EdgeLog does not run VLM on every frame. VLM is an async semantic annotator for saved events.
+- EdgeLog does not store YOLO object logs as the product result. YOLO is only a cheap trigger.
+- SmolVLM2 is not treated as a free-form describer or strict JSON backend. Its useful protocol is FINAL_ANSWER yes/no verification.
+- Gemma VLM is slow and reserved for asynchronous event description.
 - Local-only privacy blocks semantic offload and records a reject event instead.
 - INT8 is treated as an experimental optimization because detection drift keeps it out of the default product path.
 - The C++ worker is a hot-path exploration, not the default EdgeLog runtime.
@@ -1247,6 +1425,7 @@ def main() -> None:
     use_sample_mode, api_base_url = render_header()
     pages = [
         "Live Event Stream",
+        "Event Rules",
         "Event Search",
         "Daily Summary",
         "System Status",
@@ -1259,6 +1438,8 @@ def main() -> None:
 
     if page == "Live Event Stream":
         render_live_monitor(use_sample_mode, api_base_url)
+    elif page == "Event Rules":
+        render_event_rules()
     elif page == "Event Search":
         render_event_search()
     elif page == "Daily Summary":

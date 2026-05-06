@@ -1,13 +1,14 @@
 # EdgeLog Storage Retention Policy
 
-EdgeLog is local-first by design. The local YOLO TensorRT path can refresh snapshots repeatedly, but ordinary frames are not kept forever. Only video events with operational value are retained.
+EdgeLog is local-first by design. The local cheap-trigger path can refresh snapshots repeatedly, but ordinary frames are not kept forever. Only proposals/events with semantic value are retained.
 
 ## What Is Saved
 
 Long-term Event History records are saved when one of these conditions is true:
 
 - the user explicitly saves the event;
-- a YOLO trigger rule matches;
+- a cheap trigger creates a proposal that is verified, unknown, failed, or explicitly saved;
+- a YOLO trigger rule matches and is promoted by the verifier;
 - a local alert is generated;
 - a VLM review is queued, running, done, or failed;
 - privacy policy rejects a semantic review;
@@ -16,17 +17,17 @@ Long-term Event History records are saved when one of these conditions is true:
 
 Detection changes during ordinary auto refresh are not retained by themselves. They update latest-snapshot metadata unless the user saves the snapshot or a trigger/review/reject/error condition occurs.
 
-Each saved event can include the EdgeLog schema fields: event type, start/end time, duration, objects, ROI name, confidence, risk level, semantic status, semantic description, keyframe path, clip path placeholder, route/backend, latency, privacy mode, and retention metadata.
+Each saved event can include the EdgeLog schema fields: event rule, proposal evidence, verifier answer/reason, description, storage metadata, event type, start/end time, duration, ROI name, risk level, route/backend, latency, privacy mode, and retention metadata.
 
 ## What Is Not Saved
 
-Auto-refresh frames that do not trigger an alert, reject, backend error, VLM review, detection change, or user save are not written to long-term Event History. They only update:
+Auto-refresh frames that do not create a verified/unknown/failed proposal, reject, backend error, semantic review, or user save are not written to long-term Event History. They only update:
 
 ```text
 runtime_data/events/latest_snapshot.jpg
 ```
 
-That file is overwritten on each ordinary refresh. Per-frame monitoring stores structured YOLO results only. It does not generate scene descriptions or VLM text for every frame.
+That file is overwritten on each ordinary refresh. Per-frame monitoring stores cheap trigger metadata only. It does not generate scene descriptions or VLM text for every frame.
 
 ## Image Retention
 
