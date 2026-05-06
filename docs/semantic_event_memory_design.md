@@ -69,7 +69,12 @@ Current status:
 
 - Mock verifier validates workflow in offline demo mode.
 - SmolVLM2-256M is connected as an RTX fast-verifier service through `POST /v1/verify_event`.
-- Jetson SmolVLM2 deployment is future work.
+- Jetson SmolVLM2-256M feasibility is now measured as a Yellow result: `946.24 ms` average latency, `1675.01 ms` P95, `1.0` parse success, and `855.06 MB` peak CUDA memory. It is viable as a low-frequency local semantic sentinel, not as per-frame VLM inference.
+
+This changes the deployment interpretation:
+
+- Jetson local layer: cheap anomaly monitor plus optional low-frequency SmolVLM2 sentinel for privacy-sensitive or offline checks.
+- RTX layer: faster/high-throughput SmolVLM2 verifier fallback, slow Gemma describer, and Qwen summarizer/search assistant.
 
 ## Layer 3: Slow Semantic Describer / Summarizer
 
@@ -96,12 +101,13 @@ This layer does not run on every frame and does not participate in realtime trig
 YOLO can detect fixed classes quickly, but it cannot answer "is this a safety event?" or "was the important device removed?" by itself. VLMs can reason about semantic rules, but they are too slow and expensive to run on every frame. The three-layer design combines both:
 
 - local cheap triggers for speed;
-- fast VLM verifier for semantic yes/no decisions;
+- low-frequency local or RTX fast VLM verifier for semantic yes/no decisions;
 - slow describer for rich event memory.
 
 ## Current Limitations
 
 - Fast verifier is live on RTX when `smolvlm2_fast` is selected and the 8092 service is running; mock remains available offline.
+- Jetson SmolVLM2 is feasible only as a low-frequency async sentinel. It does not replace cheap triggers or RTX/Gemma roles.
 - Object change is rule-based and coarse.
 - Search is JSONL keyword/filter search.
 - Clip storage is schema-ready but not implemented as a ring buffer.

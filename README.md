@@ -64,6 +64,7 @@ YOLO TensorRT remains valuable because it is fast and local, but it is only a ch
 | --- | --- |
 | Cheap trigger path | YOLOv8n TensorRT FP16 averages about 14.54 ms inference on Jetson benchmark evidence. |
 | Fast verifier | SmolVLM2-256M is connected as an RTX FINAL_ANSWER verifier; validation passed YES / NO / UNKNOWN and graceful fallback cases. |
+| Jetson local sentinel | SmolVLM2-256M runs on Jetson Orin Nano as a low-frequency async sentinel: 10/10 success, 946.24 ms average, 1675.01 ms P95, 100% final-line parse success, 855.06 MB peak CUDA memory. Not a per-frame VLM. |
 | Slow describer | Gemma 4 E2B-it Q4 + mmproj is real, not mock, and is reserved for async event descriptions. |
 | Text summary backend | Qwen text LLMs handle daily summary and search assistant roles. |
 | Camera integration | CSI IMX219 + GStreamer Argus capture is validated. Snapshot capture can be around 1s; YOLO inference is much faster. |
@@ -109,7 +110,7 @@ EdgeLog validation artifacts:
 
 Validation covers proposal creation, verifier YES/NO/UNKNOWN/failure, duplicate proposal suppression, search, daily summary exclusion of rejected candidates, retention, and system status expectations. The live SmolVLM2 verifier validation is tracked separately in `docs/smolvlm2_fast_verifier_integration.md`.
 
-Latest real-mode stack validation passed Jetson camera YOLO (`15.22 ms` local inference), RTX SmolVLM2 verification (`267.15 ms` in the workflow case), RTX Gemma description (`16322.17 ms`, async-only), and RTX text summary (`538.9 ms`) through the EdgeLog gateway path.
+Latest real-mode stack validation passed Jetson camera YOLO (`15.22 ms` local inference), RTX SmolVLM2 verification (`267.15 ms` in the workflow case), RTX Gemma description (`16322.17 ms`, async-only), and RTX text summary (`538.9 ms`) through the EdgeLog gateway path. Separate Jetson feasibility testing shows SmolVLM2-256M can run locally as a low-frequency semantic sentinel, with `946.24 ms` average latency and `1675.01 ms` P95.
 
 ## Documentation Map
 
@@ -118,6 +119,7 @@ Product docs:
 - [docs/semantic_event_memory_design.md](docs/semantic_event_memory_design.md)
 - [docs/semantic_event_memory_validation.md](docs/semantic_event_memory_validation.md)
 - [docs/smolvlm2_fast_verifier_integration.md](docs/smolvlm2_fast_verifier_integration.md)
+- [docs/jetson_smolvlm2_feasibility.md](docs/jetson_smolvlm2_feasibility.md)
 - [docs/edgelog_product_spec.md](docs/edgelog_product_spec.md)
 - [docs/edgelog_v1_validation.md](docs/edgelog_v1_validation.md)
 - [docs/edgelog_real_mode_validation.md](docs/edgelog_real_mode_validation.md)
@@ -154,7 +156,7 @@ These are intentionally not committed:
 
 - Prototype, not production serving.
 - Single camera and fixed scene only.
-- Fast VLM verification requires the RTX SmolVLM2 service on `127.0.0.1:8092`; mock mode remains available for offline demos.
+- RTX SmolVLM2 remains the preferred higher-throughput verifier; Jetson SmolVLM2 is feasible only as a low-frequency async sentinel.
 - Gemma VLM is asynchronous and slow; it is not a real-time detector.
 - Event clips are schema-ready via `clip_path`, but v1 keeps keyframes as the stable path.
 - Search is local JSONL keyword/filter search, not SQLite FTS5 or embeddings yet.

@@ -71,6 +71,7 @@ Current implementation:
 - `mock_final_line` verifies the workflow when offline.
 - `smolvlm2_fast` calls the RTX SmolVLM2-256M service on `127.0.0.1:8092`.
 - Full real-mode validation measured the SmolVLM2 verifier path at `267.15 ms` for the sample event-rule case.
+- Jetson SmolVLM2-256M feasibility now lands in Yellow: 10/10 successful runs, `946.24 ms` average latency, `1675.01 ms` P95, `1.0` parse success, and `855.06 MB` peak CUDA memory. This makes it a low-frequency local semantic sentinel candidate, not a per-frame VLM.
 
 ### 3. Slow Semantic Describer / Summarizer
 
@@ -166,15 +167,34 @@ Rejected candidates are not counted as meaningful events.
 
 - Jetson CSI camera and YOLO TensorRT local fast path.
 - Gateway local/remote/reject infrastructure.
+- Jetson low-frequency SmolVLM2 semantic sentinel feasibility in an isolated `~/venvs/smolvlm2-jetson` environment.
 - Event proposal generation from YOLO/ROI/object-change signals.
 - Mock FINAL_ANSWER verifier workflow and live RTX SmolVLM2 fast verifier.
 - JSONL event memory with retention.
 - Search and deterministic daily summaries.
 - Async slow VLM description path remains available for event review.
 
+## Jetson / RTX Split
+
+Jetson responsibilities:
+
+- camera capture;
+- cheap anomaly monitoring and proposal generation;
+- optional YOLO TensorRT fast visual signal;
+- low-frequency local SmolVLM2 semantic sentinel for privacy-sensitive or offline checks;
+- event keyframe / clip retention schema;
+- privacy and local-only enforcement.
+
+RTX responsibilities:
+
+- Gemma slow semantic describer for confirmed or high-value events;
+- Qwen daily summary and search assistant;
+- higher-throughput or fallback SmolVLM2 verification when Jetson should not spend local cycles;
+- heavier semantic review when local sentinel confidence is not enough.
+
 ## Roadmap
 
-1. Broaden live SmolVLM2 verifier validation across more real event rules.
+1. Broaden live SmolVLM2 verifier validation across more real event rules on both RTX and Jetson low-frequency modes.
 2. Add clip ring buffer with pre/post event seconds.
 3. Add SQLite FTS5 event index.
 4. Add embedding search for semantic descriptions.

@@ -91,6 +91,38 @@ These calls align with the earlier sub-second verifier benchmark. Model load is 
 
 In the full EdgeLog real-mode validation, the workflow-level SmolVLM2 verifier case passed with `267.15 ms` latency and parse success. That case is recorded in `serving/results/raw/edgelog_real_mode_validation.csv`.
 
+## Jetson Local Feasibility
+
+Artifact:
+
+- `serving/results/raw/jetson_smolvlm2_feasibility_summary.csv`
+
+SmolVLM2-256M has also been tested directly on Jetson Orin Nano 8GB in an isolated environment at `~/venvs/smolvlm2-jetson`.
+
+Result:
+
+| Metric | Value |
+| --- | --- |
+| Runs | 10 |
+| Success | 10/10 |
+| Average latency | `946.24 ms` |
+| P50 / P95 | `860.65 ms` / `1675.01 ms` |
+| Parse success | `1.0` |
+| Peak CUDA memory | `855.06 MB` |
+| Model load latency | `4817.17 ms` |
+| Recommendation | `local_async_low_frequency_candidate` |
+
+Important setup notes:
+
+- The initial Jetson blocker was dependency-related, not a model capability failure.
+- `torch 2.11.0` could see CUDA but failed CUBLAS matmul with `CUBLAS_STATUS_ALLOC_FAILED`.
+- `torch 2.8.0` with system CUBLAS 12.6 and venv-local cuDNN/cuDSS ran CUDA matmul successfully.
+- `torchvision 0.23.0` was required for the SmolVLM image processor.
+- The model cache was synced from the WSL / RTX Hugging Face cache because Jetson Hugging Face network / DNS was unstable.
+- Short YES / NO / UNKNOWN style prompts worked; longer `FINAL_DECISION` prompts caused format repetition.
+
+Architecture impact: Jetson SmolVLM2 is now a local async / low-frequency semantic sentinel candidate. It should not be described as per-frame real-time VLM. RTX SmolVLM2 remains useful as a faster fallback or higher-throughput verifier, and Gemma remains the slower semantic describer.
+
 ## EdgeLog Behavior
 
 When `verifier_backend=smolvlm2_fast`:
@@ -104,7 +136,8 @@ When the service is not available, the UI can still use `mock_final_line` for of
 
 ## Current Limits
 
-- The verifier runs on RTX/WSL, not Jetson.
+- RTX/WSL remains the default fast verifier path for sub-second, higher-throughput checks.
+- Jetson SmolVLM2 is feasible as a low-frequency async local sentinel, not as per-frame VLM inference.
 - It is a short-answer semantic verifier only.
 - It does not replace YOLO cheap triggers.
 - It does not replace Gemma for longer descriptions.
