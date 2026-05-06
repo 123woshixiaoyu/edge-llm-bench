@@ -100,12 +100,16 @@ EdgeLog validation artifacts:
 
 - [docs/edgelog_product_spec.md](docs/edgelog_product_spec.md)
 - [docs/edgelog_v1_validation.md](docs/edgelog_v1_validation.md)
+- [docs/edgelog_real_mode_validation.md](docs/edgelog_real_mode_validation.md)
 - [docs/semantic_event_memory_design.md](docs/semantic_event_memory_design.md)
 - [docs/semantic_event_memory_validation.md](docs/semantic_event_memory_validation.md)
 - [serving/results/raw/edgelog_v1_validation.csv](serving/results/raw/edgelog_v1_validation.csv)
+- [serving/results/raw/edgelog_real_mode_validation.csv](serving/results/raw/edgelog_real_mode_validation.csv)
 - [serving/results/raw/semantic_event_memory_validation.csv](serving/results/raw/semantic_event_memory_validation.csv)
 
 Validation covers proposal creation, verifier YES/NO/UNKNOWN/failure, duplicate proposal suppression, search, daily summary exclusion of rejected candidates, retention, and system status expectations. The live SmolVLM2 verifier validation is tracked separately in `docs/smolvlm2_fast_verifier_integration.md`.
+
+Latest real-mode stack validation passed Jetson camera YOLO (`15.22 ms` local inference), RTX SmolVLM2 verification (`267.15 ms` in the workflow case), RTX Gemma description (`16322.17 ms`, async-only), and RTX text summary (`538.9 ms`) through the EdgeLog gateway path.
 
 ## Documentation Map
 
@@ -116,6 +120,7 @@ Product docs:
 - [docs/smolvlm2_fast_verifier_integration.md](docs/smolvlm2_fast_verifier_integration.md)
 - [docs/edgelog_product_spec.md](docs/edgelog_product_spec.md)
 - [docs/edgelog_v1_validation.md](docs/edgelog_v1_validation.md)
+- [docs/edgelog_real_mode_validation.md](docs/edgelog_real_mode_validation.md)
 - [demo/README.md](demo/README.md)
 - [serving/docs/interactive_gateway_demo.md](serving/docs/interactive_gateway_demo.md)
 - [docs/storage_retention_policy.md](docs/storage_retention_policy.md)

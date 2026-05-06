@@ -1,11 +1,11 @@
 case,expected,actual,status,backend,final_answer,parse_success,latency_ms,error,notes
 health endpoint ready,ready=true,"{""backend"": ""smolvlm2_256m_final_line"", ""device"": ""cuda"", ""error"": """", ""load_latency_ms"": 29538.72, ""model"": ""HuggingFaceTB/SmolVLM2-256M-Video-Instruct"", ""ready"": true, ""status"": ""ok""}",PASS,smolvlm2_256m_final_line,,,,,
-YES case parse_success true,final_answer=YES,final_answer=YES parse_success=True,PASS,smolvlm2_256m_final_line,YES,True,433.36,,
-NO case parse_success true,final_answer=NO,final_answer=NO parse_success=True,PASS,smolvlm2_256m_final_line,NO,True,250.25,,
-UNKNOWN ambiguous case parse_success true,final_answer=UNKNOWN,final_answer=UNKNOWN parse_success=True,PASS,smolvlm2_256m_final_line,UNKNOWN,True,316.21,,
-invalid image graceful error,error without crash,image_path does not exist: D:\AI\edge-llm-bench\missing-image.jpg,PASS,smolvlm2_256m_final_line,,False,0.34,image_path does not exist: D:\AI\edge-llm-bench\missing-image.jpg,
-timeout / service unavailable graceful fallback,semantic_status=failed with error,failed SmolVLM2 verifier unavailable on unused validation port,PASS,,,,2061.93,SmolVLM2 verifier unavailable on unused validation port,
-EdgeLog proposal -> SmolVLM2 -> verified event,event_status=verified,event_status=verified final_answer=YES,PASS,smolvlm2_256m_final_line,YES,True,433.36,,
-EdgeLog proposal -> SmolVLM2 -> rejected event,event_status=rejected,event_status=rejected final_answer=NO,PASS,smolvlm2_256m_final_line,NO,True,250.25,,
-EdgeLog proposal -> SmolVLM2 -> unknown event,event_status=unknown,event_status=unknown final_answer=UNKNOWN,PASS,smolvlm2_256m_final_line,UNKNOWN,True,316.21,,
-latency_ms recorded,avg/p50/p95 recorded,avg=333.27 p50=316.21 p95=433.36,PASS,smolvlm2_256m_final_line,,,333.27,,p95 uses max for the three validation calls.
+YES case parse_success true,final_answer=YES,final_answer=YES parse_success=True,PASS,smolvlm2_256m_final_line,YES,True,289.24,,
+NO case parse_success true,final_answer=NO,final_answer=NO parse_success=True,PASS,smolvlm2_256m_final_line,NO,True,249.92,,
+UNKNOWN ambiguous case parse_success true,final_answer=UNKNOWN,final_answer=UNKNOWN parse_success=True,PASS,smolvlm2_256m_final_line,UNKNOWN,True,314.18,,
+invalid image graceful error,error without crash,image_path does not exist: D:\AI\edge-llm-bench\missing-image.jpg,PASS,smolvlm2_256m_final_line,,False,0.32,image_path does not exist: D:\AI\edge-llm-bench\missing-image.jpg,
+timeout / service unavailable graceful fallback,semantic_status=failed with error,failed SmolVLM2 verifier unavailable on unused validation port,PASS,,,,2037.76,SmolVLM2 verifier unavailable on unused validation port,
+EdgeLog proposal -> SmolVLM2 -> verified event,event_status=verified,event_status=verified final_answer=YES,PASS,smolvlm2_256m_final_line,YES,True,289.24,,
+EdgeLog proposal -> SmolVLM2 -> rejected event,event_status=rejected,event_status=rejected final_answer=NO,PASS,smolvlm2_256m_final_line,NO,True,249.92,,
+EdgeLog proposal -> SmolVLM2 -> unknown event,event_status=unknown,event_status=unknown final_answer=UNKNOWN,PASS,smolvlm2_256m_final_line,UNKNOWN,True,314.18,,
+latency_ms recorded,avg/p50/p95 recorded,avg=284.45 p50=289.24 p95=314.18,PASS,smolvlm2_256m_final_line,,,284.45,,p95 uses max for the three validation calls.

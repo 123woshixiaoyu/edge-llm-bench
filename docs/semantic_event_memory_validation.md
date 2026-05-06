@@ -10,6 +10,8 @@ cheap trigger -> proposal -> verifier YES/NO/UNKNOWN -> semantic event memory ->
 
 This validation keeps using the mock FINAL_ANSWER adapter so the semantic workflow can be tested without external services. Live RTX SmolVLM2 integration is validated separately in `docs/smolvlm2_fast_verifier_integration.md` and `serving/results/raw/smolvlm2_fast_verifier_validation.csv`.
 
+The full real-mode stack is validated separately in `docs/edgelog_real_mode_validation.md` and `serving/results/raw/edgelog_real_mode_validation.csv`.
+
 ## Result Artifact
 
 - `serving/results/raw/semantic_event_memory_validation.csv`

@@ -68,9 +68,9 @@ Allowed answers are `YES`, `NO`, and `UNKNOWN`. Strict JSON is not the default b
 
 Current implementation:
 
-- `mock_final_line` verifies the workflow.
-- SmolVLM2 is a fast verifier candidate based on benchmark evidence.
-- A live SmolVLM2 service is future work.
+- `mock_final_line` verifies the workflow when offline.
+- `smolvlm2_fast` calls the RTX SmolVLM2-256M service on `127.0.0.1:8092`.
+- Full real-mode validation measured the SmolVLM2 verifier path at `267.15 ms` for the sample event-rule case.
 
 ### 3. Slow Semantic Describer / Summarizer
 
@@ -167,14 +167,14 @@ Rejected candidates are not counted as meaningful events.
 - Jetson CSI camera and YOLO TensorRT local fast path.
 - Gateway local/remote/reject infrastructure.
 - Event proposal generation from YOLO/ROI/object-change signals.
-- Mock FINAL_ANSWER verifier workflow.
+- Mock FINAL_ANSWER verifier workflow and live RTX SmolVLM2 fast verifier.
 - JSONL event memory with retention.
 - Search and deterministic daily summaries.
 - Async slow VLM description path remains available for event review.
 
 ## Roadmap
 
-1. Connect live SmolVLM2 final-line verifier service on RTX.
+1. Broaden live SmolVLM2 verifier validation across more real event rules.
 2. Add clip ring buffer with pre/post event seconds.
 3. Add SQLite FTS5 event index.
 4. Add embedding search for semantic descriptions.

@@ -82,12 +82,14 @@ Validation covered:
 
 Observed validation latency:
 
-- YES case: about `433.36 ms`.
-- NO case: about `250.25 ms`.
-- UNKNOWN case: about `316.21 ms`.
-- Three-call average: about `333.27 ms`.
+- YES case: about `289.24 ms`.
+- NO case: about `249.92 ms`.
+- UNKNOWN case: about `314.18 ms`.
+- Three-call average: about `284.45 ms`.
 
 These calls align with the earlier sub-second verifier benchmark. Model load is measured separately by `/health` and was about `29538.72 ms` in this validation run.
+
+In the full EdgeLog real-mode validation, the workflow-level SmolVLM2 verifier case passed with `267.15 ms` latency and parse success. That case is recorded in `serving/results/raw/edgelog_real_mode_validation.csv`.
 
 ## EdgeLog Behavior
 
